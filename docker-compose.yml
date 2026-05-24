@@ -1,0 +1,16 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mind-billing-db
+    restart: unless-stopped
+    ports:
+      - '5433:5432'
+    environment:
+      POSTGRES_USER: mind_billing
+      POSTGRES_PASSWORD: mind_billing_dev
+      POSTGRES_DB: mind_billing
+    volumes:
+      - mind_billing_pgdata:/var/lib/postgresql/data
+
+volumes:
+  mind_billing_pgdata:
