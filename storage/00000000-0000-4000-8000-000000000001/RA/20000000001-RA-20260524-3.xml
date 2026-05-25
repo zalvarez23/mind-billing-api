@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VoidedDocuments xmlns="urn:sunat:names:specification:ubl:peru:schema:xsd:VoidedDocuments-1" xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2" xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2" xmlns:ext="urn:oasis:names:specification:ubl:schema:xsd:CommonExtensionComponents-2" xmlns:sac="urn:sunat:names:specification:ubl:peru:schema:xsd:SunatAggregateComponents-1" xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
+  <ext:UBLExtensions>
+    <ext:UBLExtension>
+      <ext:ExtensionContent><ds:Signature Id="SignatureSP" xmlns:ds="http://www.w3.org/2000/09/xmldsig#"><ds:SignedInfo><ds:CanonicalizationMethod Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/><ds:SignatureMethod Algorithm="http://www.w3.org/2001/04/xmldsig-more#rsa-sha256"/><ds:Reference URI=""><ds:Transforms><ds:Transform Algorithm="http://www.w3.org/2000/09/xmldsig#enveloped-signature"/><ds:Transform Algorithm="http://www.w3.org/TR/2001/REC-xml-c14n-20010315"/></ds:Transforms><ds:DigestMethod Algorithm="http://www.w3.org/2001/04/xmlenc#sha256"/><ds:DigestValue>RMrCgCaXAy+3gsIELJX0Z8J0oeBCkl1gK+5Fz6E2zJc=</ds:DigestValue></ds:Reference></ds:SignedInfo><ds:SignatureValue>pp6uJu9IrfErVGr4l6pmtn/QCSf6HfN4ML3hoErDBaB4kFCtvDlp1KYms/nUhS3XRzpxnDdalIkp43f60joBDScSzMC0R1+twJ2g9RQbcW+EJAucATgENkMtPJwe7PVTw0zJ2Oo97xlQzt7tE3hN99WnP3pK85Vp3HVwNbFSjk2yQtp30QQG/VoWATYaT/qyFYllXbgan+KmN11Q/cO6QnkJAjL8QEufejOVb565cBNtTQqD3DXr9dobVb+y4cCOHJ+qajdK4DcXvbJTvavrV9R0wmyqZlW9n8zmEZ8ggHgJlp6KvDg87aiz46t9JiCK+mvsiUo/ZswLYuDzTRr/lg==</ds:SignatureValue><ds:KeyInfo><ds:X509Data><ds:X509Certificate>MIIC8zCCAdugAwIBAgIBATANBgkqhkiG9w0BAQsFADA9MQswCQYDVQQGEwJQRTEYMBYGA1UEChMPRU1QUkVTQSBERVYgU0FDMRQwEgYDVQQDEwsyMDAwMDAwMDAwMTAeFw0yNjA1MjQwNTQ1NTlaFw0yODA1MjQwNTQ1NTlaMD0xCzAJBgNVBAYTAlBFMRgwFgYDVQQKEw9FTVBSRVNBIERFViBTQUMxFDASBgNVBAMTCzIwMDAwMDAwMDAxMIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAtA0JOBO2IhVxwPNh1TeJmPKoXth66xA5U2qYfoptquxTyteleJbSdyPjgozxirYImbfddSAX95HcxGmyIUfoBpZfN4BWdjyayyKdyiTXbgyXA8kFhTJqT8mlCpZE33M9UzA1mwQgjj/YGmNPDQ0C9zu22vhrIOq80uo7aLTiKN/dH8L33lTZc3wWLBHgGcDw2oycc92nfm4kdhcdL7tfGDdGBqqDVr9MFOpP7vVMe/ce3AxtVKLbGW8PYkzK8Euyir0SoUpVBWy5oR9qKOj6LfNIoKV8CJFK9g5+Jp9acDwL6liszKpjVcfg9UtUG+BXIMGKPikieqDrIX3Kz0LegwIDAQABMA0GCSqGSIb3DQEBCwUAA4IBAQAXRI1fIOkl7olYHv+sPFZOK7bnv5V1Y624mHQMpvBgLaFaN53Zrv2BQw3eDUlPKj3CzIMoWocl4+hAswujqFMsw+7Oy3pD4JeKzO4gr9ztkblQoSOjrEkWeUsGCgXvX0EVaf+no9mG4e8YRiOE9hoStE2/jQNO/7j8TFsjEN2TraX8QEPN0lWQ5AETi1CTIfMztKQI56WW1O/YCKBxzZU+ZdQapHZGvjmKD39i0hSLheWgWjtnFyXh223sBDVM99ToFMFCpYIvVzHt68QVwZjog/jQ3KurpprXa42XIf4PJDxRbZoIjGotQu7wSUmqmZixSYF0zfGwCx+mnrK7jgX2</ds:X509Certificate></ds:X509Data></ds:KeyInfo></ds:Signature></ext:ExtensionContent>
+    </ext:UBLExtension>
+  </ext:UBLExtensions>
+  <cbc:UBLVersionID>2.0</cbc:UBLVersionID>
+  <cbc:CustomizationID>1.0</cbc:CustomizationID>
+  <cbc:ID>RA-20260524-3</cbc:ID>
+  <cbc:ReferenceDate>2026-05-24</cbc:ReferenceDate>
+  <cbc:IssueDate>2026-05-24</cbc:IssueDate>
+  <cac:Signature>
+    <cbc:ID>IDSignKG</cbc:ID>
+    <cac:SignatoryParty>
+      <cac:PartyIdentification>
+        <cbc:ID>20000000001</cbc:ID>
+      </cac:PartyIdentification>
+      <cac:PartyName>
+        <cbc:Name>EMPRESA DEV SAC</cbc:Name>
+      </cac:PartyName>
+    </cac:SignatoryParty>
+    <cac:DigitalSignatureAttachment>
+      <cac:ExternalReference>
+        <cbc:URI>#SignatureSP</cbc:URI>
+      </cac:ExternalReference>
+    </cac:DigitalSignatureAttachment>
+  </cac:Signature>
+  <cac:AccountingSupplierParty>
+    <cbc:CustomerAssignedAccountID>20000000001</cbc:CustomerAssignedAccountID>
+    <cbc:AdditionalAccountID>6</cbc:AdditionalAccountID>
+    <cac:Party>
+      <cac:PartyLegalEntity>
+        <cbc:RegistrationName>EMPRESA DEV SAC</cbc:RegistrationName>
+      </cac:PartyLegalEntity>
+    </cac:Party>
+  </cac:AccountingSupplierParty>
+  <sac:VoidedDocumentsLine>
+    <cbc:LineID>1</cbc:LineID>
+    <cbc:DocumentTypeCode>01</cbc:DocumentTypeCode>
+    <sac:DocumentSerialID>F001</sac:DocumentSerialID>
+    <sac:DocumentNumberID>12</sac:DocumentNumberID>
+    <sac:VoidReasonDescription>ERROR EN DATOS</sac:VoidReasonDescription>
+  </sac:VoidedDocumentsLine>
+</VoidedDocuments>

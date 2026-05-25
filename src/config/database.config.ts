@@ -2,6 +2,8 @@ import { registerAs } from '@nestjs/config';
 import {
   InitialSchema1710000000000,
   Sprint2Closure1710000000001,
+  Sprint3BoletasRc1710000000002,
+  Sprint3NotesRa1710000000003,
 } from '../database/migrations';
 
 export default registerAs('database', () => ({
@@ -19,5 +21,10 @@ export default registerAs('database', () => ({
     if (flag === 'false') return false;
     return process.env.NODE_ENV === 'development';
   })(),
-  migrations: [InitialSchema1710000000000, Sprint2Closure1710000000001],
+  migrations: [
+    InitialSchema1710000000000,
+    Sprint2Closure1710000000001,
+    Sprint3BoletasRc1710000000002,
+    Sprint3NotesRa1710000000003,
+  ],
 }));

@@ -12,7 +12,36 @@ export class XmlSignatureService {
     private readonly companyCertificateService: CompanyCertificateService,
   ) {}
 
-  async signInvoiceXml(company: Company, xml: string): Promise<string> {
+  signInvoiceXml(company: Company, xml: string): Promise<string> {
+    return this.signXml(company, xml, 'Invoice');
+  }
+
+  signSummaryXml(company: Company, xml: string): Promise<string> {
+    return this.signXml(company, xml, 'SummaryDocuments');
+  }
+
+  signCreditNoteXml(company: Company, xml: string): Promise<string> {
+    return this.signXml(company, xml, 'CreditNote');
+  }
+
+  signDebitNoteXml(company: Company, xml: string): Promise<string> {
+    return this.signXml(company, xml, 'DebitNote');
+  }
+
+  signVoidedDocumentsXml(company: Company, xml: string): Promise<string> {
+    return this.signXml(company, xml, 'VoidedDocuments');
+  }
+
+  private async signXml(
+    company: Company,
+    xml: string,
+    rootElement:
+      | 'Invoice'
+      | 'SummaryDocuments'
+      | 'CreditNote'
+      | 'DebitNote'
+      | 'VoidedDocuments',
+  ): Promise<string> {
     const { privateKeyPem, certificatePem } =
       await this.companyCertificateService.getSigningMaterial(company);
 
@@ -29,7 +58,7 @@ export class XmlSignatureService {
     });
 
     sig.addReference({
-      xpath: "/*[local-name(.)='Invoice']",
+      xpath: `/*[local-name(.)='${rootElement}']`,
       transforms: [ENVELOPED, C14N],
       digestAlgorithm: 'http://www.w3.org/2001/04/xmlenc#sha256',
       uri: '',

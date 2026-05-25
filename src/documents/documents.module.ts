@@ -9,10 +9,19 @@ import { SunatModule } from '../sunat/sunat.module';
 import { StorageModule } from '../storage/storage.module';
 import { UblModule } from '../ubl/ubl.module';
 import {
+  BoletasController,
+  CreditNotesController,
+  DailySummariesController,
+  DebitNotesController,
   DocumentsController,
   InvoicesController,
+  VoidedDocumentsController,
 } from './documents.controller';
+import { DailySummariesService } from './daily-summaries.service';
+import { DailySummariesXmlHelper } from './daily-summaries-xml.helper';
 import { DocumentsService } from './documents.service';
+import { VoidedDocumentsService } from './voided-documents.service';
+import { DailySummary } from './entities/daily-summary.entity';
 import { Document } from './entities/document.entity';
 import { SunatSubmission } from './entities/sunat-submission.entity';
 
@@ -21,6 +30,7 @@ import { SunatSubmission } from './entities/sunat-submission.entity';
     AuthModule,
     TypeOrmModule.forFeature([
       Document,
+      DailySummary,
       SunatSubmission,
       DocumentSeries,
       Company,
@@ -31,7 +41,20 @@ import { SunatSubmission } from './entities/sunat-submission.entity';
     StorageModule,
     CryptoModule,
   ],
-  controllers: [InvoicesController, DocumentsController],
-  providers: [DocumentsService],
+  controllers: [
+    InvoicesController,
+    BoletasController,
+    CreditNotesController,
+    DebitNotesController,
+    VoidedDocumentsController,
+    DailySummariesController,
+    DocumentsController,
+  ],
+  providers: [
+    DocumentsService,
+    DailySummariesXmlHelper,
+    DailySummariesService,
+    VoidedDocumentsService,
+  ],
 })
 export class DocumentsModule {}

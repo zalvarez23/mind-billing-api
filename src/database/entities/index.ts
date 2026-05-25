@@ -5,6 +5,7 @@ import { User } from '../../users/entities/user.entity';
 import { DocumentSeries } from '../../series/entities/document-series.entity';
 import { Customer } from '../../customers/entities/customer.entity';
 import { Document } from '../../documents/entities/document.entity';
+import { DailySummary } from '../../documents/entities/daily-summary.entity';
 import { SunatSubmission } from '../../documents/entities/sunat-submission.entity';
 
 export const entities = [
@@ -15,5 +16,6 @@ export const entities = [
   DocumentSeries,
   Customer,
   Document,
+  DailySummary,
   SunatSubmission,
 ];

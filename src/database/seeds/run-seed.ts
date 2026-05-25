@@ -1,6 +1,5 @@
 import * as bcrypt from 'bcrypt';
 import { DataSource } from 'typeorm';
-import dataSource from '../data-source';
 import { SunatDocumentType } from '../../catalog/entities/sunat-document-type.entity';
 import { Company } from '../../companies/entities/company.entity';
 import { Certificate } from '../../companies/entities/certificate.entity';
@@ -61,7 +60,9 @@ const DEV_SERIES = [
   { docType: '01', serie: 'F001' },
   { docType: '03', serie: 'B001' },
   { docType: '07', serie: 'FC01' },
+  { docType: '07', serie: 'BC01' },
   { docType: '08', serie: 'FD01' },
+  { docType: '08', serie: 'BD01' },
 ];
 
 const DEV_CUSTOMERS = [
@@ -91,7 +92,29 @@ const DEV_CUSTOMERS = [
   },
 ];
 
-export async function runSeed(connection: DataSource): Promise<void> {
+let seedInFlight: Promise<void> | null = null;
+
+function isUniqueViolation(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) {
+    return false;
+  }
+  const err = error as { code?: string; driverError?: { code?: string } };
+  return err.code === '23505' || err.driverError?.code === '23505';
+}
+
+export function runSeed(connection: DataSource): Promise<void> {
+  if (seedInFlight) {
+    return seedInFlight;
+  }
+
+  seedInFlight = runSeedOnce(connection).finally(() => {
+    seedInFlight = null;
+  });
+
+  return seedInFlight;
+}
+
+async function runSeedOnce(connection: DataSource): Promise<void> {
   const docTypeRepo = connection.getRepository(SunatDocumentType);
   const companyRepo = connection.getRepository(Company);
   const userRepo = connection.getRepository(User);
@@ -145,22 +168,31 @@ export async function runSeed(connection: DataSource): Promise<void> {
   ];
 
   for (const devUser of devUsers) {
-    const existingUser = await userRepo.findOne({
+    const existingById = await userRepo.findOne({ where: { id: devUser.id } });
+    if (existingById) {
+      console.log(`→ Usuario dev ${devUser.id} ya existe, skipping`);
+      continue;
+    }
+
+    const existingByUsername = await userRepo.findOne({
       where: { companyId: company.id, username: devUser.username },
     });
-    if (!existingUser) {
-      await userRepo.save(
-        userRepo.create({
-          id: devUser.id,
-          companyId: company.id,
-          username: devUser.username,
-          passwordHash,
-          fullName: devUser.fullName,
-          isActive: true,
-        }),
-      );
-      console.log(`✓ Usuario ${devUser.username} creado`);
+    if (existingByUsername) {
+      console.log(`→ Usuario ${devUser.username} ya existe, skipping`);
+      continue;
     }
+
+    await userRepo.save(
+      userRepo.create({
+        id: devUser.id,
+        companyId: company.id,
+        username: devUser.username,
+        passwordHash,
+        fullName: devUser.fullName,
+        isActive: true,
+      }),
+    );
+    console.log(`✓ Usuario ${devUser.username} creado`);
   }
 
   for (const item of DEV_SERIES) {
@@ -172,19 +204,26 @@ export async function runSeed(connection: DataSource): Promise<void> {
       },
     });
     if (!existingSeries) {
-      await seriesRepo.save(
-        seriesRepo.create({
-          companyId: company.id,
-          docType: item.docType,
-          serie: item.serie,
-          correlativo: 0,
-          isActive: true,
-        }),
-      );
+      try {
+        await seriesRepo.save(
+          seriesRepo.create({
+            companyId: company.id,
+            docType: item.docType,
+            serie: item.serie,
+            correlativo: 0,
+            isActive: true,
+          }),
+        );
+      } catch (error) {
+        if (!isUniqueViolation(error)) {
+          throw error;
+        }
+      }
     }
   }
   console.log('✓ Series de documentos');
 
+  const devPfxPassword = process.env.SUNAT_DEV_PFX_PASSWORD ?? 'dev-beta123';
   const existingCert = await certificateRepo.findOne({
     where: { companyId: company.id, isActive: true },
   });
@@ -193,14 +232,14 @@ export async function runSeed(connection: DataSource): Promise<void> {
       certificateRepo.create({
         companyId: company.id,
         alias: 'dev-beta',
-        pfxPath: DEV_PFX_PATH,
-        pfxPassword: DEV_PFX_PASSWORD,
+        pfxPath: 'certs/dev-beta.pfx',
+        pfxPassword: devPfxPassword,
         isActive: true,
       }),
     );
-    console.log(`✓ Certificado en certificates (${DEV_PFX_PATH})`);
+    console.log('✓ Certificado dev en certificates (certs/dev-beta.pfx)');
   } else {
-    console.log('→ Certificado ya existe en BD, skipping');
+    console.log('→ Certificado de empresa ya existe, skipping');
   }
 
   for (const item of DEV_CUSTOMERS) {
@@ -228,21 +267,3 @@ export async function runSeed(connection: DataSource): Promise<void> {
   console.log('Usuarios: admin / admin123  |  api-svc / admin123');
   console.log('------------------------\n');
 }
-async function main(): Promise<void> {
-  const connection = dataSource.isInitialized
-    ? dataSource
-    : await dataSource.initialize();
-
-  try {
-    await runSeed(connection);
-  } finally {
-    if (connection.isInitialized) {
-      await connection.destroy();
-    }
-  }
-}
-
-main().catch((error: unknown) => {
-  console.error('Seed failed:', error);
-  process.exit(1);
-});

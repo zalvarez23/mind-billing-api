@@ -17,7 +17,9 @@ export class PfxBootstrapService {
       await access(absolutePfxPath);
       return;
     } catch {
-      this.logger.warn(`PFX not found, generating beta file at ${absolutePfxPath}`);
+      this.logger.warn(
+        `PFX not found, generating beta file at ${absolutePfxPath}`,
+      );
     }
 
     await mkdir(dirname(absolutePfxPath), { recursive: true });

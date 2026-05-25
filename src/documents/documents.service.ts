@@ -12,7 +12,12 @@ import { DocumentSeries } from '../series/entities/document-series.entity';
 import { Document } from './entities/document.entity';
 import { SunatSubmission } from './entities/sunat-submission.entity';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
+import { CreateBoletaDto } from './dto/create-boleta.dto';
+import { CreateNoteDto } from './dto/create-note.dto';
+import { BoletaXmlBuilder } from '../ubl/builders/boleta-xml.builder';
 import { InvoiceXmlBuilder } from '../ubl/builders/invoice-xml.builder';
+import { NoteXmlBuilder } from '../ubl/builders/note-xml.builder';
+import { NoteBuildInput } from '../ubl/interfaces/note-build-input.interface';
 import {
   BillServiceClient,
   SendBillResult,
@@ -20,8 +25,15 @@ import {
 import { XmlSignatureService } from '../crypto/xml-signature.service';
 import { LocalStorageService } from '../storage/local-storage.service';
 import { classifySunatSubmissionError } from '../sunat/sunat-error.util';
+import {
+  BoletaCreatedResponse,
+  NoteCreatedResponse,
+} from './types/document-response.types';
 
 const INVOICE_DOC_TYPE = '01';
+const BOLETA_DOC_TYPE = '03';
+const CREDIT_NOTE_DOC_TYPE = '07';
+const DEBIT_NOTE_DOC_TYPE = '08';
 
 @Injectable()
 export class DocumentsService {
@@ -32,6 +44,8 @@ export class DocumentsService {
     @InjectRepository(SunatSubmission)
     private readonly submissionRepository: Repository<SunatSubmission>,
     private readonly invoiceXmlBuilder: InvoiceXmlBuilder,
+    private readonly boletaXmlBuilder: BoletaXmlBuilder,
+    private readonly noteXmlBuilder: NoteXmlBuilder,
     private readonly billServiceClient: BillServiceClient,
     private readonly storageService: LocalStorageService,
     private readonly xmlSignatureService: XmlSignatureService,
@@ -108,6 +122,7 @@ export class DocumentsService {
           status: DocumentStatus.DRAFT,
           total: totals.total.toFixed(2),
           payload: { ...dto, tipoOperacion: dto.tipoOperacion },
+          issueDate,
           xmlContent: xml,
         }),
       );
@@ -196,6 +211,406 @@ export class DocumentsService {
       correlativo: prepared.document.correlativo,
       status: prepared.document.status,
       total: prepared.document.total,
+      sunat: {
+        statusCode: submission.statusCode,
+        description: sunatResult.description,
+        accepted: sunatResult.accepted,
+        errorMessage: submission.errorMessage,
+      },
+    };
+  }
+
+  async createBoleta(
+    company: Company,
+    user: User,
+    dto: CreateBoletaDto,
+  ): Promise<BoletaCreatedResponse> {
+    const prepared = await this.dataSource.transaction(async (manager) => {
+      const seriesRepo = manager.getRepository(DocumentSeries);
+      const documentRepo = manager.getRepository(Document);
+
+      const series = await seriesRepo.findOne({
+        where: {
+          companyId: company.id,
+          docType: BOLETA_DOC_TYPE,
+          serie: dto.serie,
+          isActive: true,
+        },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!series) {
+        throw new BadRequestException(
+          `Series ${dto.serie} not found for boleta type ${BOLETA_DOC_TYPE}`,
+        );
+      }
+
+      const correlativo = series.correlativo + 1;
+      series.correlativo = correlativo;
+      await seriesRepo.save(series);
+
+      const now = new Date();
+      const issueDate = now.toISOString().slice(0, 10);
+      const issueTime = now.toISOString().slice(11, 19);
+
+      const { xml: unsignedXml, totals } = this.boletaXmlBuilder.build({
+        ruc: company.ruc,
+        businessName: company.businessName,
+        tradeName: company.tradeName,
+        address: company.address,
+        ubigeo: company.ubigeo,
+        serie: dto.serie,
+        correlativo,
+        tipoOperacion: dto.tipoOperacion,
+        moneda: dto.moneda,
+        cliente: dto.cliente,
+        items: dto.items,
+        issueDate,
+        issueTime,
+        formaPago: dto.formaPago,
+      });
+
+      const xml = await this.xmlSignatureService.signInvoiceXml(
+        company,
+        unsignedXml,
+      );
+
+      const fileBaseName = this.boletaXmlBuilder.getFileBaseName(
+        company.ruc,
+        dto.serie,
+        correlativo,
+      );
+
+      const document = await documentRepo.save(
+        documentRepo.create({
+          companyId: company.id,
+          createdById: user.id,
+          docType: BOLETA_DOC_TYPE,
+          serie: dto.serie,
+          correlativo,
+          status: DocumentStatus.SIGNED,
+          total: totals.total.toFixed(2),
+          issueDate,
+          payload: {
+            ...dto,
+            totals,
+            cliente: dto.cliente,
+            moneda: dto.moneda,
+          },
+          xmlContent: xml,
+        }),
+      );
+
+      return {
+        document,
+        xml,
+        fileBaseName,
+        xmlFileName: `${fileBaseName}.xml`,
+      };
+    });
+
+    await this.storageService.saveDocumentFile(
+      company.id,
+      BOLETA_DOC_TYPE,
+      prepared.xmlFileName,
+      prepared.xml,
+    );
+
+    return {
+      id: prepared.document.id,
+      docType: prepared.document.docType,
+      serie: prepared.document.serie,
+      correlativo: prepared.document.correlativo,
+      status: prepared.document.status,
+      total: prepared.document.total,
+      issueDate: prepared.document.issueDate,
+      message:
+        'Boleta signed locally. Submit daily summary (RC) before end of day.',
+    };
+  }
+
+  async createCreditNote(
+    company: Company,
+    user: User,
+    dto: CreateNoteDto,
+  ): Promise<NoteCreatedResponse | Record<string, unknown>> {
+    return this.createNote(company, user, dto, CREDIT_NOTE_DOC_TYPE);
+  }
+
+  async createDebitNote(
+    company: Company,
+    user: User,
+    dto: CreateNoteDto,
+  ): Promise<NoteCreatedResponse | Record<string, unknown>> {
+    return this.createNote(company, user, dto, DEBIT_NOTE_DOC_TYPE);
+  }
+
+  private async createNote(
+    company: Company,
+    user: User,
+    dto: CreateNoteDto,
+    noteDocType: typeof CREDIT_NOTE_DOC_TYPE | typeof DEBIT_NOTE_DOC_TYPE,
+  ): Promise<NoteCreatedResponse | Record<string, unknown>> {
+    const affected = await this.documentRepository.findOne({
+      where: { id: dto.documentoAfectadoId, companyId: company.id },
+    });
+
+    if (!affected) {
+      throw new NotFoundException('Affected document not found');
+    }
+
+    if (
+      affected.docType !== INVOICE_DOC_TYPE &&
+      affected.docType !== BOLETA_DOC_TYPE
+    ) {
+      throw new BadRequestException(
+        'Notes can only reference invoices (01) or boletas (03)',
+      );
+    }
+
+    if (
+      affected.docType === INVOICE_DOC_TYPE &&
+      affected.status !== DocumentStatus.ACCEPTED
+    ) {
+      throw new BadRequestException(
+        'Credit/debit notes for invoices require an accepted invoice',
+      );
+    }
+
+    if (
+      affected.docType === BOLETA_DOC_TYPE &&
+      affected.status !== DocumentStatus.SIGNED &&
+      affected.status !== DocumentStatus.ACCEPTED
+    ) {
+      throw new BadRequestException(
+        'Credit/debit notes for boletas require a signed or accepted boleta',
+      );
+    }
+
+    const prepared = await this.dataSource.transaction(async (manager) => {
+      const seriesRepo = manager.getRepository(DocumentSeries);
+      const documentRepo = manager.getRepository(Document);
+
+      const series = await seriesRepo.findOne({
+        where: {
+          companyId: company.id,
+          docType: noteDocType,
+          serie: dto.serie,
+          isActive: true,
+        },
+        lock: { mode: 'pessimistic_write' },
+      });
+
+      if (!series) {
+        throw new BadRequestException(
+          `Series ${dto.serie} not found for note type ${noteDocType}`,
+        );
+      }
+
+      const correlativo = series.correlativo + 1;
+      series.correlativo = correlativo;
+      await seriesRepo.save(series);
+
+      const now = new Date();
+      const issueDate = now.toISOString().slice(0, 10);
+      const issueTime = now.toISOString().slice(11, 19);
+
+      const noteInput: NoteBuildInput = {
+        ruc: company.ruc,
+        businessName: company.businessName,
+        address: company.address,
+        ubigeo: company.ubigeo,
+        serie: dto.serie,
+        correlativo,
+        noteDocType,
+        moneda: dto.moneda,
+        cliente: dto.cliente,
+        items: dto.items,
+        issueDate,
+        issueTime,
+        documentoAfectado: {
+          docType: affected.docType,
+          serie: affected.serie,
+          correlativo: affected.correlativo,
+        },
+        motivoCodigo: dto.motivoCodigo,
+        motivoDescripcion: dto.motivoDescripcion,
+      };
+
+      const buildResult =
+        noteDocType === CREDIT_NOTE_DOC_TYPE
+          ? this.noteXmlBuilder.buildCreditNote(noteInput)
+          : this.noteXmlBuilder.buildDebitNote(noteInput);
+
+      const xml =
+        noteDocType === CREDIT_NOTE_DOC_TYPE
+          ? await this.xmlSignatureService.signCreditNoteXml(
+              company,
+              buildResult.xml,
+            )
+          : await this.xmlSignatureService.signDebitNoteXml(
+              company,
+              buildResult.xml,
+            );
+
+      const fileBaseName = this.noteXmlBuilder.getFileBaseName(
+        company.ruc,
+        noteDocType,
+        dto.serie,
+        correlativo,
+      );
+
+      const documentoAfectado = {
+        id: affected.id,
+        docType: affected.docType,
+        serie: affected.serie,
+        correlativo: affected.correlativo,
+        issueDate: affected.issueDate,
+      };
+
+      const document = await documentRepo.save(
+        documentRepo.create({
+          companyId: company.id,
+          createdById: user.id,
+          docType: noteDocType,
+          serie: dto.serie,
+          correlativo,
+          status:
+            affected.docType === BOLETA_DOC_TYPE
+              ? DocumentStatus.SIGNED
+              : DocumentStatus.DRAFT,
+          total: buildResult.totals.total.toFixed(2),
+          issueDate,
+          payload: {
+            ...dto,
+            totals: buildResult.totals,
+            cliente: dto.cliente,
+            moneda: dto.moneda,
+            documentoAfectado,
+          },
+          xmlContent: xml,
+        }),
+      );
+
+      return {
+        document,
+        affected,
+        xml,
+        fileBaseName,
+        xmlFileName: `${fileBaseName}.xml`,
+        totals: buildResult.totals,
+      };
+    });
+
+    await this.storageService.saveDocumentFile(
+      company.id,
+      noteDocType,
+      prepared.xmlFileName,
+      prepared.xml,
+    );
+
+    if (prepared.affected.docType === BOLETA_DOC_TYPE) {
+      return {
+        id: prepared.document.id,
+        docType: prepared.document.docType,
+        serie: prepared.document.serie,
+        correlativo: prepared.document.correlativo,
+        status: prepared.document.status,
+        total: prepared.document.total,
+        issueDate: prepared.document.issueDate,
+        documentoAfectado: prepared.document.payload?.documentoAfectado,
+        message:
+          'Note signed locally. Include it in the daily summary (RC) for the same reference date.',
+      };
+    }
+
+    return this.submitSendBill(
+      company,
+      prepared.document,
+      prepared.xmlFileName,
+      prepared.xml,
+      prepared.fileBaseName,
+      noteDocType,
+    );
+  }
+
+  private async submitSendBill(
+    company: Company,
+    document: Document,
+    xmlFileName: string,
+    xml: string,
+    fileBaseName: string,
+    storageDocType: string,
+  ): Promise<Record<string, unknown>> {
+    let sunatResult: SendBillResult;
+    let submission: SunatSubmission;
+
+    try {
+      document.status = DocumentStatus.SUBMITTED;
+      await this.documentRepository.save(document);
+
+      sunatResult = await this.billServiceClient.sendBill(
+        company,
+        xmlFileName,
+        xml,
+      );
+
+      document.status = sunatResult.accepted
+        ? DocumentStatus.ACCEPTED
+        : DocumentStatus.REJECTED;
+      await this.documentRepository.save(document);
+
+      submission = await this.submissionRepository.save(
+        this.submissionRepository.create({
+          documentId: document.id,
+          method: 'sendBill',
+          ticket: null,
+          statusCode: sunatResult.statusCode,
+          cdrXml: sunatResult.cdrXml,
+          errorMessage: sunatResult.accepted
+            ? null
+            : (sunatResult.description ?? 'SUNAT rejected document'),
+        }),
+      );
+
+      if (sunatResult.cdrXml) {
+        await this.storageService.saveDocumentFile(
+          company.id,
+          storageDocType,
+          `R-${fileBaseName}.xml`,
+          sunatResult.cdrXml,
+        );
+      }
+    } catch (error) {
+      const classified = classifySunatSubmissionError(error);
+      document.status = classified.status;
+      await this.documentRepository.save(document);
+
+      submission = await this.submissionRepository.save(
+        this.submissionRepository.create({
+          documentId: document.id,
+          method: 'sendBill',
+          ticket: null,
+          statusCode: null,
+          cdrXml: null,
+          errorMessage: classified.errorMessage,
+        }),
+      );
+
+      throw new BadRequestException({
+        message: classified.errorMessage,
+        documentId: document.id,
+        status: document.status,
+      });
+    }
+
+    return {
+      id: document.id,
+      docType: document.docType,
+      serie: document.serie,
+      correlativo: document.correlativo,
+      status: document.status,
+      total: document.total,
       sunat: {
         statusCode: submission.statusCode,
         description: sunatResult.description,

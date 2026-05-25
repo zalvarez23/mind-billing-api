@@ -55,10 +55,7 @@ export class CompanyCertificateService {
     }
 
     try {
-      const material = await loadPfxFromFile(
-        pfxPath,
-        certificate.pfxPassword,
-      );
+      const material = await loadPfxFromFile(pfxPath, certificate.pfxPassword);
       this.logger.debug(`Signing with certificate ${certificate.id}`);
       return material;
     } catch (error) {

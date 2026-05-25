@@ -12,6 +12,7 @@ import { DocumentStatus } from '../../common/enums';
 import { Company } from '../../companies/entities/company.entity';
 import { User } from '../../users/entities/user.entity';
 import { SunatSubmission } from './sunat-submission.entity';
+import { DailySummary } from './daily-summary.entity';
 
 @Entity('documents')
 export class Document {
@@ -54,6 +55,18 @@ export class Document {
 
   @Column({ name: 'xml_content', type: 'text', nullable: true })
   xmlContent: string | null;
+
+  @Column({ name: 'issue_date', type: 'date', nullable: true })
+  issueDate: string | null;
+
+  @Column({ name: 'daily_summary_id', type: 'uuid', nullable: true })
+  dailySummaryId: string | null;
+
+  @ManyToOne(() => DailySummary, (summary) => summary.documents, {
+    onDelete: 'SET NULL',
+  })
+  @JoinColumn({ name: 'daily_summary_id' })
+  dailySummary: DailySummary | null;
 
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
