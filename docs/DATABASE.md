@@ -416,13 +416,10 @@ UPDATE daily_summaries SET status = 'rejected', error_message = 'Dev reset' WHER
 
 ## Almacenamiento de archivos (filesystem)
 
-Complemento de BD — no en Postgres:
+Solo certificados `.pfx` del emisor (firma XML). UBL y CDR viven en PostgreSQL (`xml_content`, `cdr_xml`).
 
 ```
-storage/{company_id}/{tipo}/{archivo}.xml
-storage/{company_id}/RC/...
-storage/{company_id}/RA/...
-storage/{company_id}/01/R-{ruc}-01-F001-N.xml  (CDR)
+storage/{company_id}/{pfx_path}
 ```
 
 Config: `STORAGE_PATH` en `.env` (default `./storage`).

@@ -6,7 +6,6 @@ import { DocumentStatus } from '../common/enums';
 import { User } from '../users/entities/user.entity';
 import { BillServiceClient } from '../sunat/bill-service.client';
 import { XmlSignatureService } from '../crypto/xml-signature.service';
-import { LocalStorageService } from '../storage/local-storage.service';
 import { VoidedXmlBuilder } from '../ubl/builders/voided-xml.builder';
 import { VoidedLineInput } from '../ubl/interfaces/voided-build-input.interface';
 import { classifySunatSubmissionError } from '../sunat/sunat-error.util';
@@ -19,7 +18,6 @@ import {
 } from './entities/daily-summary.entity';
 
 const INVOICE_DOC_TYPE = '01';
-const RA_STORAGE_TYPE = 'RA';
 const STATUS_POLL_ATTEMPTS = 5;
 const STATUS_POLL_DELAY_MS = 2000;
 const DEFAULT_MOTIVO_BAJA = 'ERROR EN DATOS';
@@ -35,7 +33,6 @@ export class VoidedDocumentsService {
     private readonly voidedXmlBuilder: VoidedXmlBuilder,
     private readonly billServiceClient: BillServiceClient,
     private readonly xmlSignatureService: XmlSignatureService,
-    private readonly storageService: LocalStorageService,
   ) {}
 
   async submitVoidedDocuments(
@@ -145,13 +142,6 @@ export class VoidedDocumentsService {
       };
     });
 
-    await this.storageService.saveDocumentFile(
-      company.id,
-      RA_STORAGE_TYPE,
-      prepared.xmlFileName,
-      prepared.xml,
-    );
-
     try {
       prepared.summary.status = DailySummaryStatus.SUBMITTED;
       await this.dailySummaryRepository.save(prepared.summary);
@@ -172,10 +162,8 @@ export class VoidedDocumentsService {
       );
 
       return this.applyStatusResult(
-        company,
         prepared.summary,
         prepared.invoices,
-        prepared.fileBaseName,
         statusResult,
       );
     } catch (error) {
@@ -251,10 +239,8 @@ export class VoidedDocumentsService {
   }
 
   private async applyStatusResult(
-    company: Company,
     summary: DailySummary,
     invoices: Document[],
-    fileBaseName: string,
     statusResult: Awaited<ReturnType<BillServiceClient['getStatus']>>,
   ): Promise<Record<string, unknown>> {
     summary.statusCode = statusResult.statusCode;
@@ -289,15 +275,6 @@ export class VoidedDocumentsService {
         await this.documentRepository.save(invoice);
       }
 
-      if (statusResult.cdrXml) {
-        await this.storageService.saveDocumentFile(
-          company.id,
-          RA_STORAGE_TYPE,
-          `R-${fileBaseName}.xml`,
-          statusResult.cdrXml,
-        );
-      }
-
       return {
         id: summary.id,
         summaryType: summary.summaryType,
@@ -322,15 +299,6 @@ export class VoidedDocumentsService {
     for (const invoice of invoices) {
       invoice.dailySummaryId = null;
       await this.documentRepository.save(invoice);
-    }
-
-    if (statusResult.cdrXml) {
-      await this.storageService.saveDocumentFile(
-        company.id,
-        RA_STORAGE_TYPE,
-        `R-${fileBaseName}.xml`,
-        statusResult.cdrXml,
-      );
     }
 
     throw new BadRequestException({

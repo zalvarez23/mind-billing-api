@@ -23,7 +23,6 @@ import {
   SendBillResult,
 } from '../sunat/bill-service.client';
 import { XmlSignatureService } from '../crypto/xml-signature.service';
-import { LocalStorageService } from '../storage/local-storage.service';
 import { classifySunatSubmissionError } from '../sunat/sunat-error.util';
 import {
   BoletaCreatedResponse,
@@ -47,7 +46,6 @@ export class DocumentsService {
     private readonly boletaXmlBuilder: BoletaXmlBuilder,
     private readonly noteXmlBuilder: NoteXmlBuilder,
     private readonly billServiceClient: BillServiceClient,
-    private readonly storageService: LocalStorageService,
     private readonly xmlSignatureService: XmlSignatureService,
   ) {}
 
@@ -135,13 +133,6 @@ export class DocumentsService {
       };
     });
 
-    await this.storageService.saveDocumentFile(
-      company.id,
-      INVOICE_DOC_TYPE,
-      prepared.xmlFileName,
-      prepared.xml,
-    );
-
     let sunatResult: SendBillResult;
     let submission: SunatSubmission;
 
@@ -172,15 +163,6 @@ export class DocumentsService {
             : (sunatResult.description ?? 'SUNAT rejected document'),
         }),
       );
-
-      if (sunatResult.cdrXml) {
-        await this.storageService.saveDocumentFile(
-          company.id,
-          INVOICE_DOC_TYPE,
-          `R-${prepared.fileBaseName}.xml`,
-          sunatResult.cdrXml,
-        );
-      }
     } catch (error) {
       const classified = classifySunatSubmissionError(error);
       prepared.document.status = classified.status;
@@ -308,13 +290,6 @@ export class DocumentsService {
         xmlFileName: `${fileBaseName}.xml`,
       };
     });
-
-    await this.storageService.saveDocumentFile(
-      company.id,
-      BOLETA_DOC_TYPE,
-      prepared.xmlFileName,
-      prepared.xml,
-    );
 
     return {
       id: prepared.document.id,
@@ -502,13 +477,6 @@ export class DocumentsService {
       };
     });
 
-    await this.storageService.saveDocumentFile(
-      company.id,
-      noteDocType,
-      prepared.xmlFileName,
-      prepared.xml,
-    );
-
     if (prepared.affected.docType === BOLETA_DOC_TYPE) {
       return {
         id: prepared.document.id,
@@ -529,8 +497,6 @@ export class DocumentsService {
       prepared.document,
       prepared.xmlFileName,
       prepared.xml,
-      prepared.fileBaseName,
-      noteDocType,
     );
   }
 
@@ -539,8 +505,6 @@ export class DocumentsService {
     document: Document,
     xmlFileName: string,
     xml: string,
-    fileBaseName: string,
-    storageDocType: string,
   ): Promise<Record<string, unknown>> {
     let sunatResult: SendBillResult;
     let submission: SunatSubmission;
@@ -572,15 +536,6 @@ export class DocumentsService {
             : (sunatResult.description ?? 'SUNAT rejected document'),
         }),
       );
-
-      if (sunatResult.cdrXml) {
-        await this.storageService.saveDocumentFile(
-          company.id,
-          storageDocType,
-          `R-${fileBaseName}.xml`,
-          sunatResult.cdrXml,
-        );
-      }
     } catch (error) {
       const classified = classifySunatSubmissionError(error);
       document.status = classified.status;

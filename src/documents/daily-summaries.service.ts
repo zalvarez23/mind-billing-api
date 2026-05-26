@@ -12,7 +12,6 @@ import {
   BillServiceClient,
   type GetStatusResult,
 } from '../sunat/bill-service.client';
-import { LocalStorageService } from '../storage/local-storage.service';
 import { classifySunatSubmissionError } from '../sunat/sunat-error.util';
 import { CloseDailySummaryDto } from './dto/close-daily-summary.dto';
 import { VoidDailySummaryDto } from './dto/void-daily-summary.dto';
@@ -37,7 +36,6 @@ import { hasRcVoidInProgress } from './types/document-payload.types';
 
 const BOLETA_DOC_TYPE = '03';
 const RC_DOC_TYPES = ['03', '07', '08'] as const;
-const RC_STORAGE_TYPE = 'RC';
 const STATUS_POLL_ATTEMPTS = 5;
 const STATUS_POLL_DELAY_MS = 2000;
 const VOID_CONDITION_CODE = '3';
@@ -55,7 +53,6 @@ export class DailySummariesService {
     private readonly documentRepository: Repository<Document>,
     private readonly rcXmlHelper: DailySummariesXmlHelper,
     private readonly billServiceClient: BillServiceClient,
-    private readonly storageService: LocalStorageService,
   ) {}
 
   async closeDailySummary(
@@ -310,13 +307,6 @@ export class DailySummariesService {
       where: { dailySummaryId: summary.id },
     });
 
-    const issueDateYmd = summary.issueDate.replace(/-/g, '');
-    const fileBaseName = this.rcXmlHelper.getFileBaseName(
-      company.ruc,
-      issueDateYmd,
-      summary.correlativo,
-    );
-
     try {
       const statusResult = await this.pollSummaryStatus(
         company,
@@ -325,10 +315,8 @@ export class DailySummariesService {
       const outcome = this.resolveSummaryOutcome(summary, documents);
 
       return this.applyStatusResult(
-        company,
         summary,
         documents,
-        fileBaseName,
         statusResult,
         outcome,
       );
@@ -373,13 +361,6 @@ export class DailySummariesService {
     outcome: SummarySubmitOutcome,
     hintWithTicket: string,
   ): Promise<Record<string, unknown>> {
-    await this.storageService.saveDocumentFile(
-      company.id,
-      RC_STORAGE_TYPE,
-      prepared.xmlFileName,
-      prepared.xml,
-    );
-
     try {
       prepared.summary.status = DailySummaryStatus.SUBMITTED;
       await this.dailySummaryRepository.save(prepared.summary);
@@ -399,10 +380,8 @@ export class DailySummariesService {
         sendResult.ticket,
       );
       return this.applyStatusResult(
-        company,
         prepared.summary,
         prepared.documents,
-        prepared.fileBaseName,
         statusResult,
         outcome,
       );
@@ -436,10 +415,8 @@ export class DailySummariesService {
   }
 
   private async applyStatusResult(
-    company: Company,
     summary: DailySummary,
     documents: Document[],
-    fileBaseName: string,
     statusResult: GetStatusResult,
     outcome: SummarySubmitOutcome,
   ): Promise<Record<string, unknown>> {
@@ -475,15 +452,6 @@ export class DailySummariesService {
         await this.documentRepository.save(doc);
       }
 
-      if (statusResult.cdrXml) {
-        await this.storageService.saveDocumentFile(
-          company.id,
-          RC_STORAGE_TYPE,
-          `R-${fileBaseName}.xml`,
-          statusResult.cdrXml,
-        );
-      }
-
       return {
         ...this.toResponse(summary),
         sunat: {
@@ -512,15 +480,6 @@ export class DailySummariesService {
         doc.dailySummaryId = null;
       }
       await this.documentRepository.save(doc);
-    }
-
-    if (statusResult.cdrXml) {
-      await this.storageService.saveDocumentFile(
-        company.id,
-        RC_STORAGE_TYPE,
-        `R-${fileBaseName}.xml`,
-        statusResult.cdrXml,
-      );
     }
 
     throw new BadRequestException({
