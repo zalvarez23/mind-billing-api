@@ -24,17 +24,22 @@ services:
       - key: DB_MIGRATIONS_RUN
         value: 'true'
       - key: DB_SEED_ON_START
-        value: 'false'
+        value: 'true'
       - key: DB_SYNC
         value: 'false'
       - key: DB_LOGGING
-        value: 'false'
+        value: 'true'
       - key: STORAGE_PATH
         value: ./storage
       - key: JWT_SECRET
         generateValue: true
       - key: JWT_EXPIRES_IN
         value: 8h
+      # SUNAT beta (equivalente a .env local)
+      - key: SUNAT_BILL_SERVICE_BETA
+        value: https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService
+      - key: SUNAT_BILL_SERVICE_PROD
+        value: https://e-factura.sunat.gob.pe/ol-ti-itcpfegem/billService
       - key: DB_HOST
         fromDatabase:
           name: mind-billing-db

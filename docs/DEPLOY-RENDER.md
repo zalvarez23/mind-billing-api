@@ -82,7 +82,20 @@ curl -X POST https://<tu-servicio>.onrender.com/v1/auth/login \
   -d '{"email":"admin@demo.pe","password":"admin123"}'
 ```
 
-El usuario demo solo existe si ejecutaste seed en algún momento (`DB_SEED_ON_START=true` una vez, o `npm run db:seed` en un shell de Render). En producción deja `DB_SEED_ON_START=false` y carga empresas/certificados reales en BD.
+El usuario demo existe si `DB_SEED_ON_START=true` (en `render.yaml` está activo para staging). En producción real pon `DB_SEED_ON_START=false` y carga empresas/certificados reales en BD.
+
+### Modo “como dev” en Render
+
+El blueprint puede alinear estas vars con tu `.env` local (la BD sigue siendo la de Render, no Docker):
+
+| Variable | Valor staging |
+|----------|----------------|
+| `DB_SEED_ON_START` | `true` (en local con `auto` basta `NODE_ENV=development`) |
+| `DB_LOGGING` | `true` |
+| `SUNAT_BILL_SERVICE_BETA` / `PROD` | URLs beta/prod de SUNAT |
+| `JWT_SECRET` | Generado por Render (no copies el de `.env`) |
+
+Tras cambiar `render.yaml`, haz push a `main` o sincroniza el blueprint; Render redeploya solo.
 
 ## Certificados SUNAT (beta / prod)
 
