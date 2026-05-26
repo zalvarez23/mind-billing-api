@@ -21,6 +21,8 @@ services:
         value: production
       - key: API_PREFIX
         value: v1
+      - key: CORS_ORIGIN
+        value: '*'
       - key: DB_MIGRATIONS_RUN
         value: 'true'
       - key: DB_SEED_ON_START
