@@ -2,6 +2,12 @@
 /dist
 /node_modules
 /build
+*.tsbuildinfo
+
+# scripts/*.ts se compilan en local; no subir .js/.d.ts generados
+scripts/**/*.js
+scripts/**/*.js.map
+scripts/**/*.d.ts
 
 # Logs
 logs
