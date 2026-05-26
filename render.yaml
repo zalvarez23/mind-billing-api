@@ -1,0 +1,57 @@
+# Blueprint: https://render.com/docs/blueprint-spec
+# Conecta el repo en Render → New → Blueprint → selecciona este archivo.
+
+databases:
+  - name: mind-billing-db
+    plan: free
+    databaseName: mind_billing
+    user: mind_billing
+
+services:
+  - type: web
+    name: mind-billing-api
+    runtime: node
+    plan: free
+    branch: main
+    buildCommand: npm ci && npm run build
+    startCommand: npm run start:prod
+    healthCheckPath: /v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: API_PREFIX
+        value: v1
+      - key: DB_MIGRATIONS_RUN
+        value: 'true'
+      - key: DB_SEED_ON_START
+        value: 'false'
+      - key: DB_SYNC
+        value: 'false'
+      - key: DB_LOGGING
+        value: 'false'
+      - key: STORAGE_PATH
+        value: ./storage
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 8h
+      - key: DB_HOST
+        fromDatabase:
+          name: mind-billing-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: mind-billing-db
+          property: port
+      - key: DB_USER
+        fromDatabase:
+          name: mind-billing-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: mind-billing-db
+          property: password
+      - key: DB_NAME
+        fromDatabase:
+          name: mind-billing-db
+          property: database

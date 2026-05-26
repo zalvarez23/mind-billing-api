@@ -314,12 +314,7 @@ export class DailySummariesService {
       );
       const outcome = this.resolveSummaryOutcome(summary, documents);
 
-      return this.applyStatusResult(
-        summary,
-        documents,
-        statusResult,
-        outcome,
-      );
+      return this.applyStatusResult(summary, documents, statusResult, outcome);
     } catch (error) {
       const classified = classifySunatSubmissionError(error);
       summary.status = DailySummaryStatus.FAILED;
