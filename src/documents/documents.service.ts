@@ -36,6 +36,7 @@ const INVOICE_DOC_TYPE = '01';
 const BOLETA_DOC_TYPE = '03';
 const CREDIT_NOTE_DOC_TYPE = '07';
 const DEBIT_NOTE_DOC_TYPE = '08';
+const IGV_RATE = 0.18;
 
 @Injectable()
 export class DocumentsService {
@@ -122,7 +123,14 @@ export class DocumentsService {
           correlativo,
           status: DocumentStatus.DRAFT,
           total: totals.total.toFixed(2),
-          payload: { ...dto, tipoOperacion: dto.tipoOperacion },
+          payload: {
+            ...dto,
+            items: this.withComputedIgv(dto.items),
+            totals,
+            cliente: dto.cliente,
+            moneda: dto.moneda,
+            tipoOperacion: dto.tipoOperacion,
+          },
           issueDate,
           xmlContent: xml,
         }),
@@ -278,6 +286,7 @@ export class DocumentsService {
           issueDate,
           payload: {
             ...dto,
+            items: this.withComputedIgv(dto.items),
             totals,
             cliente: dto.cliente,
             moneda: dto.moneda,
@@ -678,5 +687,15 @@ export class DocumentsService {
     }
 
     return latestSubmission.cdrXml;
+  }
+
+  private withComputedIgv<
+    T extends { cantidad: number; precioUnitario: number; igv?: number },
+  >(items: T[]): Array<T & { igv: number }> {
+    return items.map((item) => {
+      const subtotal = item.cantidad * item.precioUnitario;
+      const igv = item.igv ?? Number((subtotal * IGV_RATE).toFixed(2));
+      return { ...item, igv };
+    });
   }
 }
