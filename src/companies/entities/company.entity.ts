@@ -12,6 +12,7 @@ import { Certificate } from './certificate.entity';
 import { DocumentSeries } from '../../series/entities/document-series.entity';
 import { Customer } from '../../customers/entities/customer.entity';
 import { Document } from '../../documents/entities/document.entity';
+import { Product } from '../../products/entities/product.entity';
 
 @Entity('companies')
 export class Company {
@@ -80,6 +81,9 @@ export class Company {
 
   @OneToMany(() => Customer, (customer) => customer.company)
   customers: Customer[];
+
+  @OneToMany(() => Product, (product) => product.company)
+  products: Product[];
 
   @OneToMany(() => Document, (document) => document.company)
   documents: Document[];

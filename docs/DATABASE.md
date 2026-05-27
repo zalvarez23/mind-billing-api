@@ -244,6 +244,7 @@ Comprobantes electrónicos emitidos.
 | `failed` | Error técnico |
 | `observed` | Reservado |
 | `voided` | Anulado (RC void o RA) |
+| `cancelled` | Baja local antes de RC; no enviado a SUNAT |
 
 #### Campo `payload` (jsonb)
 

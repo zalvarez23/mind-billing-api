@@ -6,6 +6,7 @@ import { Certificate } from '../../companies/entities/certificate.entity';
 import { User } from '../../users/entities/user.entity';
 import { DocumentSeries } from '../../series/entities/document-series.entity';
 import { Customer } from '../../customers/entities/customer.entity';
+import { Product } from '../../products/entities/product.entity';
 import { SunatEnvironment } from '../../common/enums';
 
 export const DEV_COMPANY_ID = '00000000-0000-4000-8000-000000000001';
@@ -92,6 +93,24 @@ const DEV_CUSTOMERS = [
   },
 ];
 
+const DEV_PRODUCTS = [
+  {
+    code: 'PROD-001',
+    description: 'Producto demo unitario',
+    unitPrice: '50.00',
+  },
+  {
+    code: 'SERV-001',
+    description: 'Servicio de consultoría',
+    unitPrice: '100.00',
+  },
+  {
+    code: 'PROD-002',
+    description: 'Paquete promocional',
+    unitPrice: '118.00',
+  },
+];
+
 let seedInFlight: Promise<void> | null = null;
 
 function isUniqueViolation(error: unknown): boolean {
@@ -120,6 +139,7 @@ async function runSeedOnce(connection: DataSource): Promise<void> {
   const userRepo = connection.getRepository(User);
   const seriesRepo = connection.getRepository(DocumentSeries);
   const customerRepo = connection.getRepository(Customer);
+  const productRepo = connection.getRepository(Product);
   const certificateRepo = connection.getRepository(Certificate);
 
   for (const item of SUNAT_DOCUMENT_TYPES) {
@@ -261,6 +281,22 @@ async function runSeedOnce(connection: DataSource): Promise<void> {
     }
   }
   console.log('✓ Clientes demo');
+
+  for (const item of DEV_PRODUCTS) {
+    const existingProduct = await productRepo.findOne({
+      where: { companyId: company.id, code: item.code },
+    });
+    if (!existingProduct) {
+      await productRepo.save(
+        productRepo.create({
+          companyId: company.id,
+          ...item,
+          isActive: true,
+        }),
+      );
+    }
+  }
+  console.log('✓ Productos demo');
 
   console.log('\n--- Credenciales dev ---');
   console.log(`X-Api-Key: ${DEV_API_KEY}`);

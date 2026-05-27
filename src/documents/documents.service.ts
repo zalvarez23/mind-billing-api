@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, Repository } from 'typeorm';
+import { DataSource, In, IsNull, Repository } from 'typeorm';
 import { Company } from '../companies/entities/company.entity';
 import { DocumentStatus } from '../common/enums';
 import { User } from '../users/entities/user.entity';
@@ -32,11 +32,18 @@ import {
 } from './types/document-response.types';
 import { toDocumentListItemResponse } from './document-list.mapper';
 import { ListDocumentsQueryDto } from './dto/list-documents-query.dto';
+import { CancelDocumentsDto } from './dto/cancel-documents.dto';
+import { markDocumentCancelled } from './types/document-payload.types';
 
 const INVOICE_DOC_TYPE = '01';
 const BOLETA_DOC_TYPE = '03';
 const CREDIT_NOTE_DOC_TYPE = '07';
 const DEBIT_NOTE_DOC_TYPE = '08';
+const RC_PENDING_DOC_TYPES = [
+  BOLETA_DOC_TYPE,
+  CREDIT_NOTE_DOC_TYPE,
+  DEBIT_NOTE_DOC_TYPE,
+] as const;
 const IGV_RATE = 0.18;
 
 @Injectable()
@@ -622,7 +629,11 @@ export class DocumentsService {
       })
         .andWhere('doc.dailySummaryId IS NULL')
         .andWhere('doc.docType IN (:...pendingRcDocTypes)', {
-          pendingRcDocTypes: [BOLETA_DOC_TYPE, CREDIT_NOTE_DOC_TYPE, DEBIT_NOTE_DOC_TYPE],
+          pendingRcDocTypes: [
+            BOLETA_DOC_TYPE,
+            CREDIT_NOTE_DOC_TYPE,
+            DEBIT_NOTE_DOC_TYPE,
+          ],
         });
     }
 
@@ -644,6 +655,78 @@ export class DocumentsService {
         totalPages: total === 0 ? 0 : Math.ceil(total / limit),
       },
     };
+  }
+
+  async cancelSignedDocuments(
+    companyId: string,
+    user: User,
+    dto: CancelDocumentsDto,
+  ): Promise<{
+    cancelled: Array<{
+      id: string;
+      docType: string;
+      serie: string;
+      correlativo: number;
+      status: DocumentStatus;
+      cancellation: {
+        cancelledBy: string;
+        cancelledAt: string;
+        cancelReason: string | null;
+      };
+    }>;
+    count: number;
+  }> {
+    const documents = await this.documentRepository.find({
+      where: {
+        id: In(dto.documentIds),
+        companyId,
+        docType: In([...RC_PENDING_DOC_TYPES]),
+        status: DocumentStatus.SIGNED,
+        dailySummaryId: IsNull(),
+      },
+    });
+
+    if (documents.length !== dto.documentIds.length) {
+      throw new BadRequestException(
+        'All documentIds must be signed boletas/notes (03/07/08) without RC for this company',
+      );
+    }
+
+    const cancelledAt = new Date().toISOString();
+    const cancellation = {
+      cancelledBy: user.id,
+      cancelledAt,
+      cancelReason: dto.cancelReason?.trim() ?? null,
+    };
+
+    const cancelled: Array<{
+      id: string;
+      docType: string;
+      serie: string;
+      correlativo: number;
+      status: DocumentStatus;
+      cancellation: {
+        cancelledBy: string;
+        cancelledAt: string;
+        cancelReason: string | null;
+      };
+    }> = [];
+
+    for (const document of documents) {
+      markDocumentCancelled(document, cancellation);
+      document.status = DocumentStatus.CANCELLED;
+      await this.documentRepository.save(document);
+      cancelled.push({
+        id: document.id,
+        docType: document.docType,
+        serie: document.serie,
+        correlativo: document.correlativo,
+        status: document.status,
+        cancellation,
+      });
+    }
+
+    return { cancelled, count: cancelled.length };
   }
 
   async findById(companyId: string, documentId: string): Promise<Document> {

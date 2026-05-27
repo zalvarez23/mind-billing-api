@@ -97,6 +97,15 @@ Catálogo 06: `1` DNI, `6` RUC, etc.
 | GET | `/documents/:id` | Detalle con payload |
 | GET | `/documents/:id/xml` | XML UBL firmado |
 | GET | `/documents/:id/cdr` | CDR SUNAT |
+| GET | `/customers` | Listado catálogo clientes |
+| GET | `/customers/:id` | Detalle cliente |
+| POST | `/customers` | Alta cliente |
+| PATCH | `/customers/:id` | Actualizar / desactivar cliente |
+| GET | `/products` | Listado catálogo productos |
+| GET | `/products/:id` | Detalle producto |
+| POST | `/products` | Alta producto |
+| PATCH | `/products/:id` | Actualizar / desactivar producto |
+| POST | `/documents/cancel` | Baja local pre-RC (`signed` → `cancelled`) |
 
 ---
 
@@ -445,6 +454,221 @@ async function pollUntilDone(summaryId: string, token: string) {
 
 ---
 
+## Catálogo de clientes
+
+Adquirientes reutilizables por empresa. Al emitir factura/boleta, el frontend mapea un registro del catálogo al objeto `cliente` del body de emisión (`tipoDoc`, `numDoc`, `razonSocial`).
+
+### `GET /v1/customers` — Listado paginado
+
+| Param | Tipo | Default | Descripción |
+|-------|------|---------|-------------|
+| `page` | int | `1` | Página |
+| `limit` | int | `20` | Máx `100` |
+| `q` | string | — | Búsqueda en `docNumber` y `legalName` (ILIKE) |
+| `docType` | string | — | Catálogo 06: `1` DNI, `6` RUC, etc. |
+| `isActive` | boolean | — | Si se omite, devuelve activos e inactivos |
+
+**Response `200`:** `{ data: Customer[], meta: { page, limit, total, totalPages } }`
+
+```json
+{
+  "data": [{
+    "id": "uuid",
+    "docType": "6",
+    "docNumber": "20100066603",
+    "legalName": "CLIENTE CORPORATIVO SAC",
+    "email": "facturacion@cliente-demo.pe",
+    "phone": null,
+    "address": "Jr. Comercio 456, Lima",
+    "ubigeo": "150102",
+    "isActive": true,
+    "createdAt": "...",
+    "updatedAt": "..."
+  }],
+  "meta": { "page": 1, "limit": 20, "total": 3, "totalPages": 1 }
+}
+```
+
+### `GET /v1/customers/:id` — Detalle
+
+Misma forma que un elemento de `data` arriba. `404` si no existe o es de otra empresa.
+
+### `POST /v1/customers` — Alta
+
+**Body:**
+
+```json
+{
+  "docType": "6",
+  "docNumber": "20100066603",
+  "legalName": "CLIENTE CORPORATIVO SAC",
+  "email": "facturacion@cliente-demo.pe",
+  "phone": null,
+  "address": "Jr. Comercio 456, Lima",
+  "ubigeo": "150102"
+}
+```
+
+Requeridos: `docType`, `docNumber`, `legalName`. `409` si ya existe el par `(docType, docNumber)` en la empresa.
+
+### `PATCH /v1/customers/:id` — Actualización
+
+Todos los campos opcionales, incluido `isActive: false` para desactivar (soft delete).
+
+---
+
+## Catálogo de productos
+
+Ítems reutilizables por empresa. Al emitir, el frontend arma cada línea de `items[]` con `cantidad` ingresada por el usuario.
+
+### `GET /v1/products` — Listado paginado
+
+| Param | Tipo | Default | Descripción |
+|-------|------|---------|-------------|
+| `page` | int | `1` | Página |
+| `limit` | int | `20` | Máx `100` |
+| `q` | string | — | Búsqueda en `code` y `description` (ILIKE) |
+| `isActive` | boolean | — | Si se omite, devuelve activos e inactivos |
+
+**Response `200`:**
+
+```json
+{
+  "data": [{
+    "id": "uuid",
+    "code": "PROD-001",
+    "description": "Servicio de consultoría",
+    "unitPrice": 100,
+    "isActive": true,
+    "createdAt": "...",
+    "updatedAt": "..."
+  }],
+  "meta": { "page": 1, "limit": 20, "total": 3, "totalPages": 1 }
+}
+```
+
+### `GET /v1/products/:id` — Detalle
+
+`404` si no existe o es de otra empresa.
+
+### `POST /v1/products` — Alta
+
+**Body:**
+
+```json
+{
+  "code": "PROD-001",
+  "description": "Servicio de consultoría",
+  "unitPrice": 100
+}
+```
+
+`409` si el `code` ya existe en la empresa.
+
+### `PATCH /v1/products/:id` — Actualización
+
+Campos opcionales: `code`, `description`, `unitPrice`, `isActive`.
+
+---
+
+## Integración frontend (emisión)
+
+Los endpoints de emisión (`POST /invoices`, `POST /boletas`) **no cambian**. El front consume el catálogo y arma el body:
+
+```typescript
+// Cliente seleccionado del catálogo → body de emisión
+function customerToClienteInput(c: Customer) {
+  return {
+    tipoDoc: c.docType,
+    numDoc: c.docNumber,
+    razonSocial: c.legalName,
+  };
+}
+
+// Producto + cantidad → línea de comprobante
+function productToItemInput(p: Product, cantidad: number) {
+  return {
+    codigo: p.code,
+    descripcion: p.description,
+    cantidad,
+    precioUnitario: p.unitPrice,
+    // igv omitido → backend calcula 18%
+  };
+}
+
+// Ejemplo boleta
+await fetch('/v1/boletas', {
+  method: 'POST',
+  headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    serie: 'B001',
+    moneda: 'PEN',
+    cliente: customerToClienteInput(selectedCustomer),
+    items: cartLines.map((line) =>
+      productToItemInput(line.product, line.cantidad),
+    ),
+  }),
+});
+```
+
+---
+
+## Baja local pre-RC (`cancelled`)
+
+Para boletas/notas **firmadas** que **aún no** entraron en un RC (`signed`, sin `daily_summary_id`). No llama a SUNAT; el comprobante **no** se incluirá en `POST /daily-summaries`.
+
+Distinto de `voided` (anulación comunicada a SUNAT vía RC código 3 o RA).
+
+### `POST /v1/documents/cancel`
+
+**Body:**
+
+```json
+{
+  "documentIds": ["uuid-boleta-1"],
+  "cancelReason": "Emitida por error"
+}
+```
+
+| Campo | Obligatorio | Notas |
+|-------|-------------|-------|
+| `documentIds` | Sí | UUID[] de documentos |
+| `cancelReason` | No | Máx 500 caracteres |
+
+El servidor guarda en `payload.cancellation`:
+
+| Campo | Origen |
+|-------|--------|
+| `cancelledBy` | UUID del usuario JWT |
+| `cancelledAt` | ISO-8601 UTC al momento de la baja |
+| `cancelReason` | Body o `null` |
+
+**Validación:** cada id debe ser `03`/`07`/`08`, `status = signed`, `daily_summary_id` null, misma empresa.
+
+**Response `200`:**
+
+```json
+{
+  "cancelled": [{
+    "id": "...",
+    "docType": "03",
+    "serie": "B001",
+    "correlativo": 5,
+    "status": "cancelled",
+    "cancellation": {
+      "cancelledBy": "uuid-usuario",
+      "cancelledAt": "2026-05-27T18:30:00.000Z",
+      "cancelReason": "Emitida por error"
+    }
+  }],
+  "count": 1
+}
+```
+
+**Flujo:** 3 boletas `signed` → cancel 1 → RC altas incluye solo las 2 restantes `signed`.
+
+---
+
 ## Consulta de documentos
 
 ### `GET /v1/documents` — Listado paginado
@@ -687,6 +911,52 @@ export class BillingApi {
       headers: this.headers(false),
     }).then((r) => r.json());
   }
+
+  listCustomers(params: Record<string, string | number | boolean> = {}) {
+    const qs = new URLSearchParams(
+      Object.entries(params).map(([k, v]) => [k, String(v)]),
+    );
+    return fetch(`${BASE}/customers?${qs}`, {
+      headers: this.headers(false),
+    }).then((r) => r.json());
+  }
+
+  createCustomer(body: {
+    docType: string;
+    docNumber: string;
+    legalName: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    ubigeo?: string;
+  }) {
+    return fetch(`${BASE}/customers`, {
+      method: 'POST',
+      headers: this.headers(),
+      body: JSON.stringify(body),
+    }).then((r) => r.json());
+  }
+
+  listProducts(params: Record<string, string | number | boolean> = {}) {
+    const qs = new URLSearchParams(
+      Object.entries(params).map(([k, v]) => [k, String(v)]),
+    );
+    return fetch(`${BASE}/products?${qs}`, {
+      headers: this.headers(false),
+    }).then((r) => r.json());
+  }
+
+  createProduct(body: {
+    code: string;
+    description: string;
+    unitPrice: number;
+  }) {
+    return fetch(`${BASE}/products`, {
+      method: 'POST',
+      headers: this.headers(),
+      body: JSON.stringify(body),
+    }).then((r) => r.json());
+  }
 }
 ```
 
@@ -698,9 +968,9 @@ Tipos completos: [frontend-tipos-api.md](../.cursor/skills/sunat-fe/frontend-tip
 
 | Feature | Estado |
 |---------|--------|
-| CRUD clientes | Tabla existe; sin endpoints |
-| CRUD productos | No implementado |
 | `GET /daily-summaries` (listado) | Backlog |
+| `customerId` / `productId` en emisión | Backlog |
+| RC altas por whitelist `documentIds` | Backlog (hoy: auto todas las `signed`) |
 | Swagger / OpenAPI | Sprint 4 |
 
 ---
@@ -713,3 +983,5 @@ Tipos completos: [frontend-tipos-api.md](../.cursor/skills/sunat-fe/frontend-tip
 | Emisión | `src/documents/dto/create-*.dto.ts` |
 | Responses | `src/documents/types/document-response.types.ts` |
 | Routes | `src/documents/documents.controller.ts`, `src/auth/auth.controller.ts` |
+| Catálogo clientes | `src/customers/dto/*`, `src/customers/customers.controller.ts` |
+| Catálogo productos | `src/products/dto/*`, `src/products/products.controller.ts` |

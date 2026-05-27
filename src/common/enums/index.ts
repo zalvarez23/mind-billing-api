@@ -13,4 +13,6 @@ export enum DocumentStatus {
   FAILED = 'failed',
   OBSERVED = 'observed',
   VOIDED = 'voided',
+  /** Baja local antes de RC; no comunicado a SUNAT. */
+  CANCELLED = 'cancelled',
 }

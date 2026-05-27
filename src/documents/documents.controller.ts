@@ -1,4 +1,12 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+  UseGuards,
+} from '@nestjs/common';
 import { CompanyMatchGuard, JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentCompany } from '../common/decorators/current-company.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -10,6 +18,7 @@ import { VoidDailySummaryDto } from './dto/void-daily-summary.dto';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { CreateNoteDto } from './dto/create-note.dto';
 import { CreateVoidedDocumentsDto } from './dto/create-voided-documents.dto';
+import { CancelDocumentsDto } from './dto/cancel-documents.dto';
 import { ListDocumentsQueryDto } from './dto/list-documents-query.dto';
 import { DailySummariesService } from './daily-summaries.service';
 import { DocumentsService } from './documents.service';
@@ -163,6 +172,15 @@ export class DocumentsController {
     @Query() query: ListDocumentsQueryDto,
   ): Promise<DocumentListResponse> {
     return this.documentsService.findAll(company.id, query);
+  }
+
+  @Post('cancel')
+  cancelSigned(
+    @CurrentCompany() company: Company,
+    @CurrentUser() user: User,
+    @Body() dto: CancelDocumentsDto,
+  ) {
+    return this.documentsService.cancelSignedDocuments(company.id, user, dto);
   }
 
   @Get(':id')

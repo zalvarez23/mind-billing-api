@@ -36,6 +36,12 @@ import { JwtStrategy } from './strategies/jwt.strategy';
     JwtAuthGuard,
     CompanyMatchGuard,
   ],
-  exports: [AuthService, ApiKeyGuard, JwtAuthGuard, CompanyMatchGuard],
+  exports: [
+    AuthService,
+    ApiKeyGuard,
+    JwtAuthGuard,
+    CompanyMatchGuard,
+    TypeOrmModule,
+  ],
 })
 export class AuthModule {}

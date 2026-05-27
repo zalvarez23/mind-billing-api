@@ -3,6 +3,12 @@ export interface RcVoidPayload {
   originalDailySummaryId: string | null;
 }
 
+export interface DocumentCancellationPayload {
+  cancelledBy: string;
+  cancelledAt: string;
+  cancelReason: string | null;
+}
+
 export interface DocumentPayload {
   cliente?: { tipoDoc: string; numDoc: string; razonSocial?: string };
   moneda?: string;
@@ -13,6 +19,7 @@ export interface DocumentPayload {
     correlativo: number;
   };
   _rcVoid?: RcVoidPayload;
+  cancellation?: DocumentCancellationPayload;
 }
 
 export function readDocumentPayload(
@@ -25,4 +32,15 @@ export function hasRcVoidInProgress(
   payload: Record<string, unknown> | null,
 ): boolean {
   return readDocumentPayload(payload)._rcVoid !== undefined;
+}
+
+export function markDocumentCancelled(
+  document: { payload: Record<string, unknown> | null },
+  cancellation: DocumentCancellationPayload,
+): void {
+  const payload: DocumentPayload = {
+    ...readDocumentPayload(document.payload),
+    cancellation,
+  };
+  document.payload = payload as Record<string, unknown>;
 }

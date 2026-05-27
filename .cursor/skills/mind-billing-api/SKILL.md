@@ -34,11 +34,11 @@ Al **agregar o cambiar un endpoint**:
 ## Auth (resumen)
 
 ```
-POST /v1/auth/login     → solo X-Api-Key
-Resto de rutas          → X-Api-Key + Authorization: Bearer <JWT>
+POST /v1/auth/login     → sin JWT
+Resto de rutas          → Authorization: Bearer <JWT>
 ```
 
-Dev: `X-Api-Key: mbak_dev00000000000000000000000001`, login `admin` / `admin123`.
+Dev: login `ruc: 20000000001`, `username: admin`, `password: admin123`.
 
 ## Índice rápido de endpoints
 
@@ -59,14 +59,29 @@ Dev: `X-Api-Key: mbak_dev00000000000000000000000001`, login `admin` / `admin123`
 | GET | `/v1/documents/:id` |
 | GET | `/v1/documents/:id/xml` |
 | GET | `/v1/documents/:id/cdr` |
+| GET | `/v1/customers` |
+| GET | `/v1/customers/:id` |
+| POST | `/v1/customers` |
+| PATCH | `/v1/customers/:id` |
+| GET | `/v1/products` |
+| GET | `/v1/products/:id` |
+| POST | `/v1/products` |
+| PATCH | `/v1/products/:id` |
+| POST | `/v1/documents/cancel` |
 
 Detalle completo: [docs/API-REFERENCE.md](../../../docs/API-REFERENCE.md).
+
+**Catálogos → emisión:** el frontend mapea `Customer` → `cliente` y `Product` + `cantidad` → `items[]` en `POST /invoices` y `POST /boletas` (ver API-REFERENCE, sección *Integración frontend*).
+
+**Pre-RC:** `POST /documents/cancel` → `cancelled` (no SUNAT). **`voided`** = baja SUNAT post-RC (`daily-summaries/void` o RA).
 
 ## Archivos backend clave
 
 | Área | Ruta |
 |------|------|
-| Controllers | `src/documents/documents.controller.ts`, `src/auth/auth.controller.ts` |
+| Controllers | `src/documents/documents.controller.ts`, `src/auth/auth.controller.ts`, `src/customers/customers.controller.ts`, `src/products/products.controller.ts` |
+| Catálogo clientes | `src/customers/customers.service.ts` |
+| Catálogo productos | `src/products/products.service.ts` |
 | Emisión | `src/documents/documents.service.ts` |
 | RC | `src/documents/daily-summaries.service.ts` |
 | RA | `src/documents/voided-documents.service.ts` |
