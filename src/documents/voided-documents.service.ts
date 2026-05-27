@@ -10,6 +10,7 @@ import { VoidedXmlBuilder } from '../ubl/builders/voided-xml.builder';
 import { VoidedLineInput } from '../ubl/interfaces/voided-build-input.interface';
 import { classifySunatSubmissionError } from '../sunat/sunat-error.util';
 import { CreateVoidedDocumentsDto } from './dto/create-voided-documents.dto';
+import { getBusinessIsoDate } from '../common/date-time.util';
 import { Document } from './entities/document.entity';
 import {
   DailySummary,
@@ -314,7 +315,7 @@ export class VoidedDocumentsService {
   }
 
   private todayIsoDate(): string {
-    return new Date().toISOString().slice(0, 10);
+    return getBusinessIsoDate();
   }
 
   private sleep(ms: number): Promise<void> {

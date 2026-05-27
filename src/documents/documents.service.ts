@@ -24,6 +24,7 @@ import {
 } from '../sunat/bill-service.client';
 import { XmlSignatureService } from '../crypto/xml-signature.service';
 import { classifySunatSubmissionError } from '../sunat/sunat-error.util';
+import { getBusinessDateTime } from '../common/date-time.util';
 import {
   BoletaCreatedResponse,
   DocumentListResponse,
@@ -82,9 +83,7 @@ export class DocumentsService {
       series.correlativo = correlativo;
       await seriesRepo.save(series);
 
-      const now = new Date();
-      const issueDate = now.toISOString().slice(0, 10);
-      const issueTime = now.toISOString().slice(11, 19);
+      const { issueDate, issueTime } = getBusinessDateTime();
 
       const { xml: unsignedXml, totals } = this.invoiceXmlBuilder.build({
         ruc: company.ruc,
@@ -242,9 +241,7 @@ export class DocumentsService {
       series.correlativo = correlativo;
       await seriesRepo.save(series);
 
-      const now = new Date();
-      const issueDate = now.toISOString().slice(0, 10);
-      const issueTime = now.toISOString().slice(11, 19);
+      const { issueDate, issueTime } = getBusinessDateTime();
 
       const { xml: unsignedXml, totals } = this.boletaXmlBuilder.build({
         ruc: company.ruc,
@@ -398,9 +395,7 @@ export class DocumentsService {
       series.correlativo = correlativo;
       await seriesRepo.save(series);
 
-      const now = new Date();
-      const issueDate = now.toISOString().slice(0, 10);
-      const issueTime = now.toISOString().slice(11, 19);
+      const { issueDate, issueTime } = getBusinessDateTime();
 
       const noteInput: NoteBuildInput = {
         ruc: company.ruc,

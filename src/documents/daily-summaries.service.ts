@@ -33,6 +33,7 @@ import {
   DailySummaryType,
 } from './entities/daily-summary.entity';
 import { hasRcVoidInProgress } from './types/document-payload.types';
+import { getBusinessIsoDate } from '../common/date-time.util';
 
 const BOLETA_DOC_TYPE = '03';
 const RC_DOC_TYPES = ['03', '07', '08'] as const;
@@ -630,7 +631,7 @@ export class DailySummariesService {
   }
 
   private todayIsoDate(): string {
-    return new Date().toISOString().slice(0, 10);
+    return getBusinessIsoDate();
   }
 
   private sleep(ms: number): Promise<void> {
