@@ -105,6 +105,7 @@ Catálogo 06: `1` DNI, `6` RUC, etc.
 | GET | `/products/:id` | Detalle producto |
 | POST | `/products` | Alta producto |
 | PATCH | `/products/:id` | Actualizar / desactivar producto |
+| GET | `/series` | Series activas por tipo (empresa) |
 | POST | `/documents/cancel` | Baja local pre-RC (`signed` → `cancelled`) |
 
 ---
@@ -568,6 +569,49 @@ Todos los campos opcionales, incluido `isActive: false` para desactivar (soft de
 ### `PATCH /v1/products/:id` — Actualización
 
 Campos opcionales: `code`, `description`, `unitPrice`, `isActive`.
+
+---
+
+## Series por tipo
+
+Series activas de documentos por empresa (catálogo local en `document_series`). El frontend usa `serie` para el body de emisión.
+
+### `GET /v1/series` — Listado
+
+**Query params (todos opcionales):**
+
+| Param | Tipo | Default | Descripción |
+|-------|------|---------|-------------|
+| `page` | int | `1` | Página |
+| `limit` | int | `20` | Máx `100` |
+| `q` | string | — | Búsqueda por `serie` (ILIKE) |
+| `docType` | string | — | Tipo SUNAT: `01`, `03`, `07`, `08` |
+| `isActive` | boolean | — | Si se omite, devuelve activas e inactivas |
+
+**Response `200`:**
+
+```json
+{
+  "data": [
+    {
+      "id": "uuid",
+      "docType": "03",
+      "serie": "B001",
+      "correlativo": 5,
+      "isActive": true,
+      "createdAt": "...",
+    }
+  ],
+  "meta": { "page": 1, "limit": 20, "total": 1, "totalPages": 1 }
+}
+```
+
+**Ejemplos:**
+
+```http
+GET /v1/series?docType=03&isActive=true
+GET /v1/series?q=B001
+```
 
 ---
 

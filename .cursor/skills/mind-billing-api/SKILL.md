@@ -67,6 +67,7 @@ Dev: login `ruc: 20000000001`, `username: admin`, `password: admin123`.
 | GET | `/v1/products/:id` |
 | POST | `/v1/products` |
 | PATCH | `/v1/products/:id` |
+| GET | `/v1/series` |
 | POST | `/v1/documents/cancel` |
 
 Detalle completo: [docs/API-REFERENCE.md](../../../docs/API-REFERENCE.md).
@@ -82,6 +83,7 @@ Detalle completo: [docs/API-REFERENCE.md](../../../docs/API-REFERENCE.md).
 | Controllers | `src/documents/documents.controller.ts`, `src/auth/auth.controller.ts`, `src/customers/customers.controller.ts`, `src/products/products.controller.ts` |
 | Catálogo clientes | `src/customers/customers.service.ts` |
 | Catálogo productos | `src/products/products.service.ts` |
+| Series | `src/series/series.service.ts`, `src/series/series.controller.ts` |
 | Emisión | `src/documents/documents.service.ts` |
 | RC | `src/documents/daily-summaries.service.ts` |
 | RA | `src/documents/voided-documents.service.ts` |

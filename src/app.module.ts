@@ -11,6 +11,7 @@ import { DatabaseModule } from './database/database.module';
 import { CustomersModule } from './customers/customers.module';
 import { DocumentsModule } from './documents/documents.module';
 import { ProductsModule } from './products/products.module';
+import { SeriesModule } from './series/series.module';
 import { entities } from './database/entities';
 
 @Module({
@@ -43,6 +44,7 @@ import { entities } from './database/entities';
     CustomersModule,
     ProductsModule,
     DocumentsModule,
+    SeriesModule,
   ],
 })
 export class AppModule {}
