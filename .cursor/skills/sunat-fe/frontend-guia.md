@@ -1,6 +1,6 @@
 # Guía frontend — facturación SUNAT Perú
 
-Mapeo de pantallas/flujos sobre `mind-billing-api`. Complementa [casos-practicos.md](casos-practicos.md), [proceso-facturacion.md](proceso-facturacion.md) y **[frontend-tipos-api.md](frontend-tipos-api.md)** (tipos TS, relaciones, contrato API).
+Mapeo de pantallas/flujos sobre `mind-billing-api`. Complementa [casos-practicos.md](casos-practicos.md), [proceso-facturacion.md](proceso-facturacion.md), **[docs/API-REFERENCE.md](../../../docs/API-REFERENCE.md)** (HTTP + ejemplos) y **[frontend-tipos-api.md](frontend-tipos-api.md)** (tipos TS).
 
 ## Autenticación (todas las rutas)
 
@@ -165,14 +165,18 @@ Dev: `mbak_dev00000000000000000000000001`, login `admin` / `admin123`.
 
 ## Listados recomendados
 
-| Pantalla | Filtros |
-|----------|---------|
-| Pendientes RC hoy | `signed`, `issueDate=hoy`, sin `daily_summary_id` |
-| Boletas anulables | `accepted`, `03`, con RC previo |
-| Facturas anulables (RA) | `accepted`, `01`, sin RA en curso |
-| NC pendientes RC | `07`/`08`, `signed`, hoy |
+Usar `GET /v1/documents` con query params (paginado). Detalle con ítems: `GET /v1/documents/:id`.
+
+| Pantalla | Query sugerida |
+|----------|----------------|
+| Historial del día | `?issueDate=hoy&page=1&limit=20` |
+| Pendientes RC hoy | `?issueDate=hoy&pendingRc=true` |
+| Boletas aceptadas | `?docType=03&status=accepted&from=...&to=...` |
+| Boletas anulables | `?docType=03&status=accepted` + filtrar en UI: `dailySummaryId` not null, sin `_rcVoid` |
+| Facturas anulables (RA) | `?docType=01&status=accepted` + filtrar: `!dailySummaryId` |
+| NC pendientes RC | `?docType=07&status=signed&issueDate=hoy` (o `08`) |
 | RC/RA historial | `GET /daily-summaries/:id` |
-| Detalle doc | `GET /documents/:id` |
+| Detalle doc (payload + ítems) | `GET /documents/:id` |
 
 ---
 

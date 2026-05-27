@@ -30,8 +30,30 @@ URLs: `.env` → `SUNAT_BILL_SERVICE_BETA` | `_HOMOLOGACION` | `_PROD`. Ambiente
 | NC factura | `POST /v1/credit-notes` (sendBill automático, sin RC) |
 | Anular boleta no entregada | `POST /v1/daily-summaries/void` → `.../status` |
 | Anular factura | `POST /v1/voided-documents` → `POST /v1/daily-summaries/:id/status` |
+| Consulta documentos | `GET /v1/documents` → `GET /v1/documents/:id` |
 
-Auth: `X-Api-Key` + `Authorization: Bearer JWT` en todas las rutas de documentos.
+Auth en rutas de documentos: `X-Api-Key` + `Authorization: Bearer <JWT>`.
+
+**Consumo HTTP (frontend):** [docs/API-REFERENCE.md](../../../docs/API-REFERENCE.md) — params, bodies, ejemplos curl/fetch.
+
+**Tipos TypeScript:** [frontend-tipos-api.md](frontend-tipos-api.md).
+
+---
+
+## Consulta de documentos
+
+Implementación: `DocumentsService.findAll`, `list-documents-query.dto.ts`.
+
+**Contrato HTTP completo** (query params, responses, ejemplos): **[docs/API-REFERENCE.md](../../../docs/API-REFERENCE.md)** → sección *Consulta de documentos*.
+
+Resumen rápido:
+
+| Endpoint | Uso |
+|----------|-----|
+| `GET /v1/documents` | Listado paginado (`issueDate`, `docType`, `status`, `pendingRc`, …) |
+| `GET /v1/documents/:id` | Detalle + `payload` (cliente, items) |
+| `GET /v1/documents/:id/xml` | UBL firmado |
+| `GET /v1/documents/:id/cdr` | CDR SUNAT |
 
 ---
 
@@ -175,8 +197,9 @@ RUC: 20000000001
 | RC helpers | `src/documents/daily-summaries-rc.util.ts`, `daily-summaries-xml.helper.ts` |
 | RA service | `src/documents/voided-documents.service.ts` |
 | Docs/NC | `src/documents/documents.service.ts` |
+| Listado docs | `src/documents/dto/list-documents-query.dto.ts`, `document-list.mapper.ts` |
 | Controller | `src/documents/documents.controller.ts` |
-| DTOs | `close-daily-summary.dto.ts`, `void-daily-summary.dto.ts`, `create-voided-documents.dto.ts`, `create-note.dto.ts` |
+| DTOs | `list-documents-query.dto.ts`, `close-daily-summary.dto.ts`, `void-daily-summary.dto.ts`, `create-voided-documents.dto.ts`, `create-note.dto.ts` |
 | UBL RC | `src/ubl/builders/summary-xml.builder.ts` |
 | UBL RA | `src/ubl/builders/voided-xml.builder.ts` |
 | UBL boleta/nota | `boleta-xml.builder.ts`, `note-xml.builder.ts` |
@@ -191,3 +214,5 @@ RUC: 20000000001
 - [proceso-facturacion.md](proceso-facturacion.md) — flujo general
 - [casos-practicos.md](casos-practicos.md) — casos 1–11 + troubleshooting beta
 - [frontend-guia.md](frontend-guia.md) — pantallas y formularios
+- [frontend-tipos-api.md](frontend-tipos-api.md) — tipos TS, cliente API, mapa endpoints
+- [docs/API-REFERENCE.md](../../../docs/API-REFERENCE.md) — referencia HTTP para frontend

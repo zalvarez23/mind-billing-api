@@ -21,7 +21,9 @@ Referencia de reglas SUNAT, procesos implementados y decisiones de negocio para 
 | [casos-practicos.md](casos-practicos.md) | Casos 1–11, checklist UI, errores comunes, troubleshooting beta |
 | [frontend-tipos-api.md](frontend-tipos-api.md) | **TypeScript** — requests, responses, enums, relaciones FE, cliente API |
 | [frontend-guia.md](frontend-guia.md) | Pantallas, formularios, estados, polling RC/RA |
-| [mind-billing-api.md](mind-billing-api.md) | Endpoints, guards, código, archivos clave |
+| [mind-billing-api.md](mind-billing-api.md) | Implementación backend NestJS ↔ SUNAT, guards, archivos |
+| [docs/API-REFERENCE.md](../../../docs/API-REFERENCE.md) | **Referencia HTTP para frontend** — todos los endpoints + ejemplos |
+| [../mind-billing-api/SKILL.md](../mind-billing-api/SKILL.md) | Skill del API REST (índice + mantenimiento) |
 | [docs/ROADMAP.md](../../../docs/ROADMAP.md) | Sprints, hecho vs pendiente |
 
 ---

@@ -5,6 +5,7 @@ Estado del plan de facturación electrónica SUNAT (Perú).
 | Doc          | Contenido                                          |
 | ------------ | -------------------------------------------------- |
 | Este archivo | Sprints, hecho vs pendiente, **backlog de tareas** |
+| [API-REFERENCE.md](./API-REFERENCE.md) | **Referencia HTTP** — consumo desde frontend, ejemplos |
 | [DATABASE.md](./DATABASE.md) | **Esquema PostgreSQL** — tablas, relaciones, estados, queries |
 | `.cursor/skills/sunat-fe/` | Reglas SUNAT, casos prácticos, guía frontend, mapeo API |
 
@@ -137,6 +138,7 @@ Sprint 5  ░░░░░░░░░░░░░░░░░░░░    0%  GR
 | POST   | `/v1/voided-documents`           | RA baja facturas `accepted`    |
 | GET    | `/v1/daily-summaries/:id`        | Detalle RC/RA                  |
 | POST   | `/v1/daily-summaries/:id/status` | Reconsultar ticket (RC y RA)   |
+| GET    | `/v1/documents`                  | Listado paginado (filtros fecha, tipo, status) |
 | GET    | `/v1/documents/:id`              | Detalle documento              |
 | GET    | `/v1/documents/:id/xml`          | XML                            |
 | GET    | `/v1/documents/:id/cdr`          | CDR                            |

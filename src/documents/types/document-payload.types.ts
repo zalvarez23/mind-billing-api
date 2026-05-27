@@ -4,7 +4,7 @@ export interface RcVoidPayload {
 }
 
 export interface DocumentPayload {
-  cliente?: { tipoDoc: string; numDoc: string };
+  cliente?: { tipoDoc: string; numDoc: string; razonSocial?: string };
   moneda?: string;
   totals?: { subtotal: number; igvTotal: number; total: number };
   documentoAfectado?: {

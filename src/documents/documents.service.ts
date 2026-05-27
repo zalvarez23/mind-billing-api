@@ -26,8 +26,11 @@ import { XmlSignatureService } from '../crypto/xml-signature.service';
 import { classifySunatSubmissionError } from '../sunat/sunat-error.util';
 import {
   BoletaCreatedResponse,
+  DocumentListResponse,
   NoteCreatedResponse,
 } from './types/document-response.types';
+import { toDocumentListItemResponse } from './document-list.mapper';
+import { ListDocumentsQueryDto } from './dto/list-documents-query.dto';
 
 const INVOICE_DOC_TYPE = '01';
 const BOLETA_DOC_TYPE = '03';
@@ -571,6 +574,70 @@ export class DocumentsService {
         description: sunatResult.description,
         accepted: sunatResult.accepted,
         errorMessage: submission.errorMessage,
+      },
+    };
+  }
+
+  async findAll(
+    companyId: string,
+    query: ListDocumentsQueryDto,
+  ): Promise<DocumentListResponse> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+
+    const qb = this.documentRepository
+      .createQueryBuilder('doc')
+      .where('doc.companyId = :companyId', { companyId });
+
+    if (query.issueDate) {
+      qb.andWhere('doc.issueDate = :issueDate', { issueDate: query.issueDate });
+    } else {
+      if (query.from) {
+        qb.andWhere('doc.issueDate >= :from', { from: query.from });
+      }
+      if (query.to) {
+        qb.andWhere('doc.issueDate <= :to', { to: query.to });
+      }
+    }
+
+    if (query.docType) {
+      qb.andWhere('doc.docType = :docType', { docType: query.docType });
+    }
+
+    if (query.status) {
+      qb.andWhere('doc.status = :status', { status: query.status });
+    }
+
+    if (query.serie) {
+      qb.andWhere('doc.serie = :serie', { serie: query.serie });
+    }
+
+    if (query.pendingRc) {
+      qb.andWhere('doc.status = :signedStatus', {
+        signedStatus: DocumentStatus.SIGNED,
+      })
+        .andWhere('doc.dailySummaryId IS NULL')
+        .andWhere('doc.docType IN (:...pendingRcDocTypes)', {
+          pendingRcDocTypes: [BOLETA_DOC_TYPE, CREDIT_NOTE_DOC_TYPE, DEBIT_NOTE_DOC_TYPE],
+        });
+    }
+
+    qb.orderBy('doc.issueDate', 'DESC')
+      .addOrderBy('doc.serie', 'ASC')
+      .addOrderBy('doc.correlativo', 'DESC');
+
+    const [documents, total] = await qb
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return {
+      data: documents.map(toDocumentListItemResponse),
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: total === 0 ? 0 : Math.ceil(total / limit),
       },
     };
   }

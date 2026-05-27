@@ -2,6 +2,8 @@
 
 Referencia para implementar **TypeScript types**, modelos de dominio y cliente HTTP en el frontend que consume `mind-billing-api`.
 
+**Referencia HTTP con ejemplos curl/fetch:** [docs/API-REFERENCE.md](../../../docs/API-REFERENCE.md).
+
 Complementa [frontend-guia.md](frontend-guia.md) y [base-de-datos.md](base-de-datos.md).
 
 ---
@@ -103,7 +105,7 @@ erDiagram
 | `Document.payload._rcVoid` | opcional | Void RC en curso; ocultar de selección void |
 | `DailySummary.summaryType` | `RC` \| `RA` | Misma pantalla polling; distinto copy UI |
 
-**No hay endpoint list documents aún** — hoy el FE obtiene docs por `GET /documents/:id` o guarda IDs tras crear. Backlog: `GET /documents` con filtros.
+**Listado:** `GET /v1/documents` con filtros y paginación. Detalle completo (payload + ítems): `GET /v1/documents/:id`.
 
 ---
 
@@ -163,6 +165,7 @@ export interface DocumentPayload {
 
 ```typescript
 export interface LoginRequest {
+  ruc: string;
   username: string;
   password: string;
 }
@@ -203,7 +206,6 @@ export interface MeResponse {
 
 ```typescript
 export interface ApiHeaders {
-  'X-Api-Key': string;
   Authorization: `Bearer ${string}`;
 }
 ```
@@ -331,6 +333,83 @@ export interface NoteSignedResponse {
   message: string;
 }
 ```
+
+### Listado `GET /v1/documents`
+
+Query params (todos opcionales):
+
+| Param | Tipo | Descripción |
+|-------|------|-------------|
+| `issueDate` | `IsoDate` | Día exacto de emisión (prioridad sobre `from`/`to`) |
+| `from` | `IsoDate` | Inicio de rango |
+| `to` | `IsoDate` | Fin de rango |
+| `docType` | `SunatDocType` | `01`, `03`, `07`, `08` |
+| `status` | `DocumentStatus` | ej. `signed`, `accepted` |
+| `serie` | `string` | ej. `B001` |
+| `pendingRc` | `boolean` | `true` → `signed` + sin RC + tipos `03`/`07`/`08` |
+| `page` | `number` | default `1` |
+| `limit` | `number` | default `20`, máx `100` |
+
+```typescript
+export interface DocumentListClienteSummary {
+  tipoDoc: string;
+  numDoc: string;
+  razonSocial: string | null;
+}
+
+export interface DocumentListItem {
+  id: string;
+  docType: SunatDocType;
+  serie: string;
+  correlativo: number;
+  status: DocumentStatus;
+  total: string;
+  issueDate: IsoDate | null;
+  dailySummaryId: string | null;
+  cliente: DocumentListClienteSummary | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PaginationMeta {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface DocumentListResponse {
+  data: DocumentListItem[];
+  meta: PaginationMeta;
+}
+
+export interface ListDocumentsQuery {
+  issueDate?: IsoDate;
+  from?: IsoDate;
+  to?: IsoDate;
+  docType?: SunatDocType;
+  status?: DocumentStatus;
+  serie?: string;
+  pendingRc?: boolean;
+  page?: number;
+  limit?: number;
+}
+```
+
+Ejemplos:
+
+```typescript
+// Comprobantes del día
+GET /v1/documents?issueDate=2026-05-26
+
+// Boletas aceptadas del mes
+GET /v1/documents?from=2026-05-01&to=2026-05-31&docType=03&status=accepted
+
+// Pendientes RC hoy
+GET /v1/documents?issueDate=2026-05-26&pendingRc=true&page=1&limit=20
+```
+
+Orden: `issueDate` desc → `serie` asc → `correlativo` desc.
 
 ### Detalle `GET /v1/documents/:id`
 
@@ -475,6 +554,7 @@ En axios/fetch, parsear `error.response.data` como `SunatSubmitError` cuando `st
 | POST | `/voided-documents` | `VoidedDocumentsRequest` | `DailySummarySubmitResponse` |
 | GET | `/daily-summaries/:id` | — | `DailySummaryDetail` |
 | POST | `/daily-summaries/:id/status` | — | `DailySummarySubmitResponse` |
+| GET | `/documents` | query `ListDocumentsQuery` | `DocumentListResponse` |
 | GET | `/documents/:id` | — | `DocumentDetail` |
 | GET | `/documents/:id/xml` | — | `{ xml: string }` o stream |
 | GET | `/documents/:id/cdr` | — | `{ cdr: string }` o stream |
@@ -548,7 +628,6 @@ const BASE = '/v1';
 
 export class BillingApiClient {
   constructor(
-    private apiKey: string,
     private getToken: () => string | null,
   ) {}
 
@@ -556,9 +635,23 @@ export class BillingApiClient {
     const token = this.getToken();
     return {
       'Content-Type': 'application/json',
-      'X-Api-Key': this.apiKey,
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     };
+  }
+
+  async listDocuments(query: ListDocumentsQuery = {}): Promise<DocumentListResponse> {
+    const params = new URLSearchParams();
+    for (const [key, value] of Object.entries(query)) {
+      if (value !== undefined && value !== null && value !== '') {
+        params.set(key, String(value));
+      }
+    }
+    const qs = params.toString();
+    const res = await fetch(`${BASE}/documents${qs ? `?${qs}` : ''}`, {
+      headers: this.headers(),
+    });
+    if (!res.ok) throw await res.json();
+    return res.json();
   }
 
   async getDocument(id: string): Promise<DocumentDetail> {
@@ -612,12 +705,12 @@ export function defaultNoteSerie(affectedDocType: '01' | '03', noteType: '07' | 
 ## Checklist implementación FE
 
 - [ ] Enums alineados con backend (no inventar estados)
+- [ ] `GET /documents` con `ListDocumentsQuery` + tabla paginada
 - [ ] `DocumentPayload` tipado para formularios de detalle
 - [ ] Discriminar NC boleta (`signed`) vs NC factura (`accepted` + sunat)
 - [ ] Una pantalla/componente `DailySummaryStatusPoller` para RC y RA
 - [ ] Manejar `SunatSubmitError.ticket` → mostrar botón poll, no reenviar
 - [ ] Guards UI desde `UiDocument` (`canVoidBoleta`, etc.)
-- [ ] Cuando exista `GET /documents` list, extender tipos con paginación
 
 ---
 
@@ -631,5 +724,7 @@ export function defaultNoteSerie(affectedDocType: '01' | '03', noteType: '07' | 
 | `CloseDailySummaryRequest` | `src/documents/dto/close-daily-summary.dto.ts` |
 | `VoidDailySummaryRequest` | `src/documents/dto/void-daily-summary.dto.ts` |
 | `VoidedDocumentsRequest` | `src/documents/dto/create-voided-documents.dto.ts` |
+| `DocumentListItem` / `DocumentListResponse` | `src/documents/types/document-response.types.ts` + `document-list.mapper.ts` |
+| `ListDocumentsQuery` | `src/documents/dto/list-documents-query.dto.ts` |
 | `DocumentDetail` | `src/documents/types/document-response.types.ts` + mapper |
 | Enums | `src/common/enums/index.ts`, `daily-summary.entity.ts` |

@@ -1,5 +1,4 @@
-import { Body, Controller, Get, Param, Post, UseGuards } from '@nestjs/common';
-import { ApiKeyGuard } from '../auth/guards/api-key.guard';
+import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
 import { CompanyMatchGuard, JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { CurrentCompany } from '../common/decorators/current-company.decorator';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
@@ -11,18 +10,20 @@ import { VoidDailySummaryDto } from './dto/void-daily-summary.dto';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { CreateNoteDto } from './dto/create-note.dto';
 import { CreateVoidedDocumentsDto } from './dto/create-voided-documents.dto';
+import { ListDocumentsQueryDto } from './dto/list-documents-query.dto';
 import { DailySummariesService } from './daily-summaries.service';
 import { DocumentsService } from './documents.service';
 import { toDocumentDetailResponse } from './document-detail.mapper';
 import {
   BoletaCreatedResponse,
   DocumentDetailResponse,
+  DocumentListResponse,
   NoteCreatedResponse,
 } from './types/document-response.types';
 import { VoidedDocumentsService } from './voided-documents.service';
 
 @Controller('invoices')
-@UseGuards(ApiKeyGuard, JwtAuthGuard, CompanyMatchGuard)
+@UseGuards(JwtAuthGuard, CompanyMatchGuard)
 export class InvoicesController {
   constructor(private readonly documentsService: DocumentsService) {}
 
@@ -37,7 +38,7 @@ export class InvoicesController {
 }
 
 @Controller('boletas')
-@UseGuards(ApiKeyGuard, JwtAuthGuard, CompanyMatchGuard)
+@UseGuards(JwtAuthGuard, CompanyMatchGuard)
 export class BoletasController {
   constructor(private readonly documentsService: DocumentsService) {}
 
@@ -52,7 +53,7 @@ export class BoletasController {
 }
 
 @Controller('credit-notes')
-@UseGuards(ApiKeyGuard, JwtAuthGuard, CompanyMatchGuard)
+@UseGuards(JwtAuthGuard, CompanyMatchGuard)
 export class CreditNotesController {
   constructor(private readonly documentsService: DocumentsService) {}
 
@@ -67,7 +68,7 @@ export class CreditNotesController {
 }
 
 @Controller('debit-notes')
-@UseGuards(ApiKeyGuard, JwtAuthGuard, CompanyMatchGuard)
+@UseGuards(JwtAuthGuard, CompanyMatchGuard)
 export class DebitNotesController {
   constructor(private readonly documentsService: DocumentsService) {}
 
@@ -82,7 +83,7 @@ export class DebitNotesController {
 }
 
 @Controller('voided-documents')
-@UseGuards(ApiKeyGuard, JwtAuthGuard, CompanyMatchGuard)
+@UseGuards(JwtAuthGuard, CompanyMatchGuard)
 export class VoidedDocumentsController {
   constructor(
     private readonly voidedDocumentsService: VoidedDocumentsService,
@@ -103,7 +104,7 @@ export class VoidedDocumentsController {
 }
 
 @Controller('daily-summaries')
-@UseGuards(ApiKeyGuard, JwtAuthGuard, CompanyMatchGuard)
+@UseGuards(JwtAuthGuard, CompanyMatchGuard)
 export class DailySummariesController {
   constructor(private readonly dailySummariesService: DailySummariesService) {}
 
@@ -152,9 +153,17 @@ export class DailySummariesController {
 }
 
 @Controller('documents')
-@UseGuards(ApiKeyGuard, JwtAuthGuard, CompanyMatchGuard)
+@UseGuards(JwtAuthGuard, CompanyMatchGuard)
 export class DocumentsController {
   constructor(private readonly documentsService: DocumentsService) {}
+
+  @Get()
+  findAll(
+    @CurrentCompany() company: Company,
+    @Query() query: ListDocumentsQueryDto,
+  ): Promise<DocumentListResponse> {
+    return this.documentsService.findAll(company.id, query);
+  }
 
   @Get(':id')
   async findOne(

@@ -15,12 +15,25 @@ import { JwtPayload } from './interfaces/jwt-payload.interface';
 @Injectable()
 export class AuthService {
   constructor(
+    @InjectRepository(Company)
+    private readonly companyRepository: Repository<Company>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
     private readonly jwtService: JwtService,
   ) {}
 
-  async login(company: Company, loginDto: LoginDto) {
+  async login(loginDto: LoginDto) {
+    const company = await this.companyRepository.findOne({
+      where: {
+        ruc: loginDto.ruc,
+        isActive: true,
+      },
+    });
+
+    if (!company) {
+      throw new UnauthorizedException('Invalid company');
+    }
+
     const user = await this.userRepository.findOne({
       where: {
         username: loginDto.username,

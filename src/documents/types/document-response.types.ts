@@ -30,6 +30,36 @@ export interface DocumentSunatSummary {
   createdAt: Date;
 }
 
+export interface DocumentListClienteSummary {
+  tipoDoc: string;
+  numDoc: string;
+  razonSocial: string | null;
+}
+
+export interface DocumentListItemResponse {
+  id: string;
+  docType: string;
+  serie: string;
+  correlativo: number;
+  status: DocumentStatus;
+  total: string;
+  issueDate: string | null;
+  dailySummaryId: string | null;
+  cliente: DocumentListClienteSummary | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface DocumentListResponse {
+  data: DocumentListItemResponse[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 export interface DocumentDetailResponse {
   id: string;
   docType: string;

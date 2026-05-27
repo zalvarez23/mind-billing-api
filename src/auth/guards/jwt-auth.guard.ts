@@ -26,6 +26,8 @@ export class JwtAuthGuard extends AuthGuard('jwt') {}
 @Injectable()
 export class CompanyMatchGuard implements CanActivate {
   constructor(
+    @InjectRepository(Company)
+    private readonly companyRepository: Repository<Company>,
     @InjectRepository(User)
     private readonly userRepository: Repository<User>,
   ) {}
@@ -33,31 +35,31 @@ export class CompanyMatchGuard implements CanActivate {
   async canActivate(context: ExecutionContext): Promise<boolean> {
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
 
-    const company = request[REQUEST_COMPANY_KEY];
     const jwtUser = request.user;
-
-    if (!company) {
-      throw new UnauthorizedException('Company context not resolved');
-    }
 
     if (!jwtUser) {
       throw new UnauthorizedException('JWT context not resolved');
     }
 
-    if (jwtUser.companyId !== company.id) {
-      throw new ForbiddenException(
-        'User does not belong to the company of this API key',
-      );
+    const company = await this.companyRepository.findOne({
+      where: { id: jwtUser.companyId, isActive: true },
+    });
+
+    if (!company) {
+      throw new ForbiddenException('Company is inactive or not found');
     }
 
     const user = await this.userRepository.findOne({
-      where: { id: jwtUser.sub, isActive: true },
+      where: { id: jwtUser.sub, companyId: jwtUser.companyId, isActive: true },
     });
 
     if (!user) {
-      throw new ForbiddenException('User is inactive or not found');
+      throw new ForbiddenException(
+        'User is inactive, not found, or mismatched',
+      );
     }
 
+    request[REQUEST_COMPANY_KEY] = company;
     request[REQUEST_USER_KEY] = user;
 
     return true;
