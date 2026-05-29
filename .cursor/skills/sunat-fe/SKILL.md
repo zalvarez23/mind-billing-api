@@ -116,7 +116,7 @@ Informa boletas y notas que no van por `sendBill`.
 | | Beta (dev) | Homologación (próximo paso) |
 |---|-----------|----------------------------|
 | Credenciales | `20000000001MODDATOS` / `MODDATOS` | SOL real del RUC |
-| Certificado | `dev-beta.pfx` seed | `.pfx` real en `certificates` |
+| Certificado | PFX dev en `certificates.pfx_content` (seed) | `POST /certificates` → `pfx_content` |
 | `sendBill` | Suele funcionar | Estable |
 | `getStatus` (RC/RA) | Intermitente (401 nginx, `processing` largo) | Más confiable |
 | Acción si ticket + error poll | Reintentar `/status`, no duplicar RC/RA | Validar flujo completo |

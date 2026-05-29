@@ -4,23 +4,17 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
-import { isAbsolute, join } from 'path';
 import { Repository } from 'typeorm';
 import { Company } from '../companies/entities/company.entity';
 import { Certificate } from '../companies/entities/certificate.entity';
-import { SunatEnvironment } from '../common/enums';
-import { PfxBootstrapService } from './pfx-bootstrap.service';
-import { CertificateMaterial, loadPfxFromFile } from './pfx-loader';
+import { CertificateMaterial, loadPfxFromBuffer } from './pfx-loader';
 
 @Injectable()
 export class CompanyCertificateService {
   private readonly logger = new Logger(CompanyCertificateService.name);
 
   constructor(
-    private readonly configService: ConfigService,
-    private readonly pfxBootstrap: PfxBootstrapService,
     @InjectRepository(Certificate)
     private readonly certificateRepository: Repository<Certificate>,
   ) {}
@@ -31,9 +25,9 @@ export class CompanyCertificateService {
       order: { createdAt: 'DESC' },
     });
 
-    if (!certificate?.pfxPath) {
+    if (!certificate) {
       throw new NotFoundException(
-        `No active digital certificate in DB for company ${company.ruc}.`,
+        `No active digital certificate in DB for company ${company.ruc}. Upload one via POST /v1/certificates.`,
       );
     }
 
@@ -43,19 +37,17 @@ export class CompanyCertificateService {
       );
     }
 
-    const pfxPath = this.resolvePfxPath(certificate.pfxPath, company.id);
-
-    if (company.sunatEnvironment === SunatEnvironment.BETA) {
-      await this.pfxBootstrap.ensurePfxFileExists(
-        pfxPath,
-        certificate.pfxPassword,
-        company.ruc,
-        company.businessName,
+    if (!certificate.pfxContent?.length) {
+      throw new NotFoundException(
+        `Certificate ${certificate.id} for ${company.ruc} has no PFX content in database. Re-upload via POST /v1/certificates.`,
       );
     }
 
     try {
-      const material = await loadPfxFromFile(pfxPath, certificate.pfxPassword);
+      const material = loadPfxFromBuffer(
+        certificate.pfxContent,
+        certificate.pfxPassword,
+      );
       this.logger.debug(`Signing with certificate ${certificate.id}`);
       return material;
     } catch (error) {
@@ -65,22 +57,5 @@ export class CompanyCertificateService {
         `Cannot load certificate for company ${company.ruc}: ${message}`,
       );
     }
-  }
-
-  private resolvePfxPath(pfxPath: string, companyId: string): string {
-    if (isAbsolute(pfxPath)) {
-      return pfxPath;
-    }
-
-    const storagePath = this.configService.get<string>(
-      'sunat.storagePath',
-      './storage',
-    );
-
-    if (pfxPath.startsWith('certs/')) {
-      return join(storagePath, pfxPath);
-    }
-
-    return join(storagePath, companyId, pfxPath);
   }
 }

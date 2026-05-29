@@ -28,6 +28,10 @@ export class Certificate {
   @Column({ name: 'pfx_path', type: 'varchar', length: 500, nullable: true })
   pfxPath: string | null;
 
+  /** Contenido del .pfx (recomendado en Render; el disco del contenedor es efímero). */
+  @Column({ name: 'pfx_content', type: 'bytea', nullable: true })
+  pfxContent: Buffer | null;
+
   @Column({
     name: 'pfx_password',
     type: 'varchar',

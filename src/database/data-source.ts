@@ -7,6 +7,7 @@ import {
   Sprint3BoletasRc1710000000002,
   Sprint3NotesRa1710000000003,
   CreateProducts1710000000004,
+  CertificatePfxContent1710000000005,
 } from './migrations';
 
 config();
@@ -25,6 +26,7 @@ export default new DataSource({
     Sprint3BoletasRc1710000000002,
     Sprint3NotesRa1710000000003,
     CreateProducts1710000000004,
+    CertificatePfxContent1710000000005,
   ],
   synchronize: false,
   logging: process.env.DB_LOGGING === 'true',

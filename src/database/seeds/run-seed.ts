@@ -8,6 +8,8 @@ import { DocumentSeries } from '../../series/entities/document-series.entity';
 import { Customer } from '../../customers/entities/customer.entity';
 import { Product } from '../../products/entities/product.entity';
 import { SunatEnvironment } from '../../common/enums';
+import { generateDevPfxBuffer } from '../../crypto/dev-pfx.util';
+import { extractPfxMetadata } from '../../crypto/pfx-metadata.util';
 
 export const DEV_COMPANY_ID = '00000000-0000-4000-8000-000000000001';
 export const DEV_ADMIN_ID = '00000000-0000-4000-8000-000000000010';
@@ -15,7 +17,6 @@ export const DEV_API_SVC_ID = '00000000-0000-4000-8000-000000000011';
 export const DEV_COMPANY_RUC = '20000000001';
 export const DEV_API_KEY = 'mbak_dev00000000000000000000000001';
 export const DEV_PASSWORD = 'admin123';
-export const DEV_PFX_PATH = 'certs/dev-beta.pfx';
 export const DEV_PFX_PASSWORD = 'dev-beta123';
 
 const SUNAT_DOCUMENT_TYPES = [
@@ -243,7 +244,14 @@ async function runSeedOnce(connection: DataSource): Promise<void> {
   }
   console.log('✓ Series de documentos');
 
-  const devPfxPassword = process.env.SUNAT_DEV_PFX_PASSWORD ?? 'dev-beta123';
+  const devPfxPassword = process.env.SUNAT_DEV_PFX_PASSWORD ?? DEV_PFX_PASSWORD;
+  const devPfxBuffer = generateDevPfxBuffer(
+    company.ruc,
+    company.businessName,
+    devPfxPassword,
+  );
+  const devPfxMetadata = extractPfxMetadata(devPfxBuffer, devPfxPassword);
+
   const existingCert = await certificateRepo.findOne({
     where: { companyId: company.id, isActive: true },
   });
@@ -252,12 +260,23 @@ async function runSeedOnce(connection: DataSource): Promise<void> {
       certificateRepo.create({
         companyId: company.id,
         alias: 'dev-beta',
-        pfxPath: 'certs/dev-beta.pfx',
+        pfxPath: 'dev-beta.pfx',
+        pfxContent: devPfxBuffer,
         pfxPassword: devPfxPassword,
+        validFrom: devPfxMetadata.validFrom,
+        validTo: devPfxMetadata.validTo,
         isActive: true,
       }),
     );
-    console.log('✓ Certificado dev en certificates (certs/dev-beta.pfx)');
+    console.log('✓ Certificado dev en BD (pfx_content)');
+  } else if (!existingCert.pfxContent?.length) {
+    existingCert.pfxContent = devPfxBuffer;
+    existingCert.pfxPassword = devPfxPassword;
+    existingCert.validFrom = devPfxMetadata.validFrom;
+    existingCert.validTo = devPfxMetadata.validTo;
+    existingCert.pfxPath = existingCert.pfxPath ?? 'dev-beta.pfx';
+    await certificateRepo.save(existingCert);
+    console.log('✓ Certificado dev actualizado con pfx_content en BD');
   } else {
     console.log('→ Certificado de empresa ya existe, skipping');
   }

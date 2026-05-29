@@ -150,7 +150,8 @@ Certificado digital (.pfx) por empresa para firma XML.
 | `id` | uuid PK | |
 | `company_id` | uuid FK → companies | CASCADE |
 | `alias` | varchar(100) | |
-| `pfx_path` | varchar(500) | Ruta relativa, ej. `certs/dev-beta.pfx` |
+| `pfx_path` | varchar(500) | Nombre lógico del archivo (solo UI), ej. `dev-beta.pfx` |
+| `pfx_content` | bytea | Binario del `.pfx` usado para firmar |
 | `pfx_password` | varchar(255) | Texto plano hoy; cifrado en backlog |
 | `valid_from` / `valid_to` | date | |
 | `is_active` | boolean | Una activa por empresa en runtime |

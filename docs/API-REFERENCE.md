@@ -2,11 +2,11 @@
 
 Referencia HTTP para **consumir el API desde frontend** u otro cliente.
 
-| Doc relacionada | Contenido |
-|-----------------|-----------|
+| Doc relacionada                                                           | Contenido                                   |
+| ------------------------------------------------------------------------- | ------------------------------------------- |
 | [frontend-tipos-api.md](../.cursor/skills/sunat-fe/frontend-tipos-api.md) | Tipos TypeScript, enums, `BillingApiClient` |
-| [frontend-guia.md](../.cursor/skills/sunat-fe/frontend-guia.md) | Pantallas y flujos UI |
-| [ROADMAP.md](./ROADMAP.md) | Estado del proyecto |
+| [frontend-guia.md](../.cursor/skills/sunat-fe/frontend-guia.md)           | Pantallas y flujos UI                       |
+| [ROADMAP.md](./ROADMAP.md)                                                | Estado del proyecto                         |
 
 **Base URL:** `http://localhost:3000/v1` (dev) — prefix configurable vía `API_PREFIX`.
 
@@ -16,10 +16,10 @@ Referencia HTTP para **consumir el API desde frontend** u otro cliente.
 
 ### Headers
 
-| Header | Cuándo | Valor |
-|--------|--------|-------|
-| `Authorization` | Rutas protegidas | `Bearer <JWT>` |
-| `Content-Type` | POST con body | `application/json` |
+| Header          | Cuándo           | Valor              |
+| --------------- | ---------------- | ------------------ |
+| `Authorization` | Rutas protegidas | `Bearer <JWT>`     |
+| `Content-Type`  | POST con body    | `application/json` |
 
 ### Flujo recomendado en frontend
 
@@ -36,6 +36,63 @@ username:  admin
 password:  admin123
 RUC:       20000000001
 ```
+
+---
+
+## Admin — alta de empresas
+
+Protegido por **`ADMIN_API_KEY`** en el servidor (`.env`), **no** por JWT.
+
+| Header | Valor |
+|--------|--------|
+| `X-Admin-Api-Key` | Mismo valor que `ADMIN_API_KEY` en `.env` |
+| `Content-Type` | `application/json` |
+
+### `POST /v1/admin/companies`
+
+Crea tenant: empresa + series por defecto (`F001`, `B001`, `FC01`, `BC01`, `FD01`, `BD01`) + `apiKey` tenant generado.
+
+**Body:**
+
+```json
+{
+  "ruc": "20123456789",
+  "businessName": "NUEVA EMPRESA SAC",
+  "tradeName": "Nueva Empresa",
+  "address": "Av. Principal 100",
+  "ubigeo": "150101",
+  "sunatEnvironment": "beta",
+  "solUsername": "20123456789MODDATOS",
+  "solPassword": "MODDATOS",
+  "initialUser": {
+    "username": "admin",
+    "password": "changeme123",
+    "fullName": "Administrador"
+  }
+}
+```
+
+| Campo | Obligatorio | Notas |
+|-------|-------------|-------|
+| `ruc` | Sí | 11 dígitos, único |
+| `businessName` | Sí | |
+| `initialUser` | No | Primer usuario para login (`POST /auth/login`) |
+| `sunatEnvironment` | No | Default `beta` |
+
+**Response `201`:**
+
+```json
+{
+  "company": { "id": "...", "ruc": "20123456789", "businessName": "..." },
+  "apiKey": "mbak_...",
+  "seriesCreated": 6,
+  "initialUser": { "id": "...", "username": "admin", "fullName": "Administrador" }
+}
+```
+
+Guardar **`apiKey`** del response: es la clave tenant (distinta de `ADMIN_API_KEY`). Hoy el login usa `ruc` + usuario + password; el `apiKey` queda para integraciones futuras.
+
+**Errores:** `401` clave admin inválida; `409` RUC duplicado.
 
 ---
 
@@ -69,44 +126,51 @@ Catálogo 06: `1` DNI, `6` RUC, etc.
 
 ### Series dev (seed)
 
-| docType | Uso | Series |
-|---------|-----|--------|
-| `01` | Factura | `F001` |
-| `03` | Boleta | `B001` |
-| `07` | Nota crédito | `FC01` (factura), `BC01` (boleta) |
-| `08` | Nota débito | `FD01` (factura), `BD01` (boleta) |
+| docType | Uso          | Series                            |
+| ------- | ------------ | --------------------------------- |
+| `01`    | Factura      | `F001`                            |
+| `03`    | Boleta       | `B001`                            |
+| `07`    | Nota crédito | `FC01` (factura), `BC01` (boleta) |
+| `08`    | Nota débito  | `FD01` (factura), `BD01` (boleta) |
 
 ---
 
 ## Índice de endpoints
 
-| Método | Ruta | Descripción |
-|--------|------|-------------|
-| POST | `/auth/login` | Obtener JWT |
-| GET | `/auth/me` | Usuario y empresa actual |
-| POST | `/invoices` | Emitir factura + envío SUNAT |
-| POST | `/boletas` | Emitir boleta (firmada, pendiente RC) |
-| POST | `/credit-notes` | Nota de crédito `07` |
-| POST | `/debit-notes` | Nota de débito `08` |
-| POST | `/daily-summaries` | RC altas (boletas/notas `signed`) |
-| POST | `/daily-summaries/void` | RC anulación boletas |
-| POST | `/voided-documents` | RA baja facturas |
-| GET | `/daily-summaries/:id` | Detalle RC/RA |
-| POST | `/daily-summaries/:id/status` | Polling ticket SUNAT |
-| GET | `/documents` | Listado paginado |
-| GET | `/documents/:id` | Detalle con payload |
-| GET | `/documents/:id/xml` | XML UBL firmado |
-| GET | `/documents/:id/cdr` | CDR SUNAT |
-| GET | `/customers` | Listado catálogo clientes |
-| GET | `/customers/:id` | Detalle cliente |
-| POST | `/customers` | Alta cliente |
-| PATCH | `/customers/:id` | Actualizar / desactivar cliente |
-| GET | `/products` | Listado catálogo productos |
-| GET | `/products/:id` | Detalle producto |
-| POST | `/products` | Alta producto |
-| PATCH | `/products/:id` | Actualizar / desactivar producto |
-| GET | `/series` | Series activas por tipo (empresa) |
-| POST | `/documents/cancel` | Baja local pre-RC (`signed` → `cancelled`) |
+| Método | Ruta                          | Descripción                                |
+| ------ | ----------------------------- | ------------------------------------------ |
+| POST   | `/auth/login`                 | Obtener JWT                                |
+| POST   | `/admin/companies`            | Alta empresa (header `X-Admin-Api-Key`)  |
+| GET    | `/auth/me`                    | Usuario y empresa actual                   |
+| POST   | `/invoices`                   | Emitir factura + envío SUNAT               |
+| POST   | `/boletas`                    | Emitir boleta (firmada, pendiente RC)      |
+| POST   | `/credit-notes`               | Nota de crédito `07`                       |
+| POST   | `/debit-notes`                | Nota de débito `08`                        |
+| POST   | `/daily-summaries/preview`    | Vista previa RC altas (sin SUNAT)          |
+| POST   | `/daily-summaries`            | RC altas (boletas/notas `signed`)          |
+| POST   | `/daily-summaries/void/preview` | Vista previa RC anulación boletas        |
+| POST   | `/daily-summaries/void`       | RC anulación boletas                       |
+| POST   | `/voided-documents`           | RA baja facturas                           |
+| GET    | `/daily-summaries/:id`        | Detalle RC/RA                              |
+| POST   | `/daily-summaries/:id/status` | Polling ticket SUNAT                       |
+| GET    | `/documents`                  | Listado paginado                           |
+| GET    | `/documents/:id`              | Detalle con payload                        |
+| GET    | `/documents/:id/xml`          | XML UBL firmado                            |
+| GET    | `/documents/:id/cdr`          | CDR SUNAT                                  |
+| GET    | `/certificates`               | Listado certificados digitales             |
+| GET    | `/certificates/:id`           | Detalle certificado                        |
+| POST   | `/certificates`               | Subir `.pfx` (guardado en BD `bytea`)      |
+| PATCH  | `/certificates/:id`           | Alias, password, activar/desactivar        |
+| GET    | `/customers`                  | Listado catálogo clientes                  |
+| GET    | `/customers/:id`              | Detalle cliente                            |
+| POST   | `/customers`                  | Alta cliente                               |
+| PATCH  | `/customers/:id`              | Actualizar / desactivar cliente            |
+| GET    | `/products`                   | Listado catálogo productos                 |
+| GET    | `/products/:id`               | Detalle producto                           |
+| POST   | `/products`                   | Alta producto                              |
+| PATCH  | `/products/:id`               | Actualizar / desactivar producto           |
+| GET    | `/series`                     | Series activas por tipo (empresa)          |
+| POST   | `/documents/cancel`           | Baja local pre-RC (`signed` → `cancelled`) |
 
 ---
 
@@ -256,8 +320,19 @@ Firma local. Estado resultante: **`signed`**. Debe incluirse en RC antes de fin 
 {
   "serie": "B001",
   "moneda": "PEN",
-  "cliente": { "tipoDoc": "1", "numDoc": "12345678", "razonSocial": "JUAN PEREZ" },
-  "items": [{ "codigo": "PROD-1", "descripcion": "Producto", "cantidad": 2, "precioUnitario": 50 }]
+  "cliente": {
+    "tipoDoc": "1",
+    "numDoc": "12345678",
+    "razonSocial": "JUAN PEREZ"
+  },
+  "items": [
+    {
+      "codigo": "PROD-1",
+      "descripcion": "Producto",
+      "cantidad": 2,
+      "precioUnitario": 50
+    }
+  ]
 }
 ```
 
@@ -293,8 +368,19 @@ Mismo body. Requiere documento afectado.
   "serie": "BC01",
   "moneda": "PEN",
   "documentoAfectadoId": "uuid-boleta-o-factura",
-  "cliente": { "tipoDoc": "6", "numDoc": "20100066603", "razonSocial": "EMPRESA SAC" },
-  "items": [{ "codigo": "DEV-001", "descripcion": "Devolución", "cantidad": 1, "precioUnitario": 100 }],
+  "cliente": {
+    "tipoDoc": "6",
+    "numDoc": "20100066603",
+    "razonSocial": "EMPRESA SAC"
+  },
+  "items": [
+    {
+      "codigo": "DEV-001",
+      "descripcion": "Devolución",
+      "cantidad": 1,
+      "precioUnitario": 100
+    }
+  ],
   "motivoCodigo": "01",
   "motivoDescripcion": "Anulación de la operación"
 }
@@ -329,6 +415,20 @@ Mismo body. Requiere documento afectado.
 ## Resúmenes SUNAT (RC / RA)
 
 RC y RA usan la misma tabla y el **mismo polling**: `POST /v1/daily-summaries/:id/status`.
+
+### `POST /v1/daily-summaries/preview` — Vista previa RC altas
+
+Mismos filtros que el cierre (`referenceDate`, `issueDate`) y selección: tipos `03`/`07`/`08`, `signed`, `issueDate = referenceDate`, sin RC. **No persiste** ni llama a SUNAT.
+
+| Campo extra | Default | Notas |
+|-------------|---------|-------|
+| `page` | `1` | Paginación de `documents.data` |
+| `limit` | `20` | Máx. `100` |
+| `includeXml` | `false` | XML firmado completo en `xml` |
+
+El ZIP/XML incluye **todos** los comprobantes elegibles; la paginación solo afecta la tabla JSON.
+
+---
 
 ### `POST /v1/daily-summaries` — RC altas
 
@@ -366,6 +466,12 @@ Estados intermedios: `processing`, `submitted` → usar `/status` para poll.
 
 ---
 
+### `POST /v1/daily-summaries/void/preview` — Vista previa RC anulación
+
+Mismo body que void (`documentIds`, `referenceDate`, `issueDate`) más `page`, `limit`, `includeXml`. Sin efectos en BD ni SUNAT.
+
+---
+
 ### `POST /v1/daily-summaries/void` — RC anulación boletas
 
 Boletas `03` **accepted**, no entregadas al cliente.
@@ -380,11 +486,11 @@ Boletas `03` **accepted**, no entregadas al cliente.
 }
 ```
 
-| Campo | Notas |
-|-------|-------|
-| `documentIds` | UUID[] obligatorio |
+| Campo           | Notas                                   |
+| --------------- | --------------------------------------- |
+| `documentIds`   | UUID[] obligatorio                      |
 | `referenceDate` | Fecha emisión **original** de la boleta |
-| `issueDate` | Fecha envío del RC void (default hoy) |
+| `issueDate`     | Fecha envío del RC void (default hoy)   |
 
 Tras CDR aceptado: boletas → `voided`.
 
@@ -455,37 +561,84 @@ async function pollUntilDone(summaryId: string, token: string) {
 
 ---
 
+## Certificados digitales (PFX)
+
+JWT + empresa del usuario. El `.pfx` se guarda **solo** en PostgreSQL (`pfx_content` **bytea**). No se lee `storage/certs` ni archivos en disco para firmar.
+
+Solo un certificado **`isActive: true`** por empresa se usa para firmar XML.
+
+### `GET /v1/certificates`
+
+| Param | Tipo | Notas |
+|-------|------|-------|
+| `page`, `limit` | int | Paginación |
+| `isActive` | boolean | Filtrar activos |
+
+### `POST /v1/certificates` — Subir PFX
+
+`multipart/form-data`:
+
+| Campo | Tipo | Obligatorio |
+|-------|------|-------------|
+| `file` | archivo | Sí (`.pfx` o `.p12`, máx. 2 MB) |
+| `pfxPassword` | string | Sí |
+| `alias` | string | No |
+| `setActive` | boolean | No (default `true`; desactiva otros) |
+
+```bash
+curl -X POST "$BASE/certificates" \
+  -H "Authorization: Bearer $JWT" \
+  -F "file=@/ruta/certificado.pfx" \
+  -F "pfxPassword=clave-del-pfx" \
+  -F "alias=Certificado 2026" \
+  -F "setActive=true"
+```
+
+**Response:** `validFrom`, `validTo`, `hasPfxContent: true`. No devuelve el binario ni la contraseña.
+
+### `PATCH /v1/certificates/:id`
+
+JSON: `alias`, `pfxPassword`, `isActive`. Con `isActive: true` desactiva el resto.
+
+Para **renovar** certificado: `POST` uno nuevo (recomendado) en lugar de reemplazar el binario.
+
+**Migración:** `npm run migration:run` (columna `pfx_content`).
+
+---
+
 ## Catálogo de clientes
 
 Adquirientes reutilizables por empresa. Al emitir factura/boleta, el frontend mapea un registro del catálogo al objeto `cliente` del body de emisión (`tipoDoc`, `numDoc`, `razonSocial`).
 
 ### `GET /v1/customers` — Listado paginado
 
-| Param | Tipo | Default | Descripción |
-|-------|------|---------|-------------|
-| `page` | int | `1` | Página |
-| `limit` | int | `20` | Máx `100` |
-| `q` | string | — | Búsqueda en `docNumber` y `legalName` (ILIKE) |
-| `docType` | string | — | Catálogo 06: `1` DNI, `6` RUC, etc. |
-| `isActive` | boolean | — | Si se omite, devuelve activos e inactivos |
+| Param      | Tipo    | Default | Descripción                                   |
+| ---------- | ------- | ------- | --------------------------------------------- |
+| `page`     | int     | `1`     | Página                                        |
+| `limit`    | int     | `20`    | Máx `100`                                     |
+| `q`        | string  | —       | Búsqueda en `docNumber` y `legalName` (ILIKE) |
+| `docType`  | string  | —       | Catálogo 06: `1` DNI, `6` RUC, etc.           |
+| `isActive` | boolean | —       | Si se omite, devuelve activos e inactivos     |
 
 **Response `200`:** `{ data: Customer[], meta: { page, limit, total, totalPages } }`
 
 ```json
 {
-  "data": [{
-    "id": "uuid",
-    "docType": "6",
-    "docNumber": "20100066603",
-    "legalName": "CLIENTE CORPORATIVO SAC",
-    "email": "facturacion@cliente-demo.pe",
-    "phone": null,
-    "address": "Jr. Comercio 456, Lima",
-    "ubigeo": "150102",
-    "isActive": true,
-    "createdAt": "...",
-    "updatedAt": "..."
-  }],
+  "data": [
+    {
+      "id": "uuid",
+      "docType": "6",
+      "docNumber": "20100066603",
+      "legalName": "CLIENTE CORPORATIVO SAC",
+      "email": "facturacion@cliente-demo.pe",
+      "phone": null,
+      "address": "Jr. Comercio 456, Lima",
+      "ubigeo": "150102",
+      "isActive": true,
+      "createdAt": "...",
+      "updatedAt": "..."
+    }
+  ],
   "meta": { "page": 1, "limit": 20, "total": 3, "totalPages": 1 }
 }
 ```
@@ -524,26 +677,28 @@ Todos los campos opcionales, incluido `isActive: false` para desactivar (soft de
 
 ### `GET /v1/products` — Listado paginado
 
-| Param | Tipo | Default | Descripción |
-|-------|------|---------|-------------|
-| `page` | int | `1` | Página |
-| `limit` | int | `20` | Máx `100` |
-| `q` | string | — | Búsqueda en `code` y `description` (ILIKE) |
-| `isActive` | boolean | — | Si se omite, devuelve activos e inactivos |
+| Param      | Tipo    | Default | Descripción                                |
+| ---------- | ------- | ------- | ------------------------------------------ |
+| `page`     | int     | `1`     | Página                                     |
+| `limit`    | int     | `20`    | Máx `100`                                  |
+| `q`        | string  | —       | Búsqueda en `code` y `description` (ILIKE) |
+| `isActive` | boolean | —       | Si se omite, devuelve activos e inactivos  |
 
 **Response `200`:**
 
 ```json
 {
-  "data": [{
-    "id": "uuid",
-    "code": "PROD-001",
-    "description": "Servicio de consultoría",
-    "unitPrice": 100,
-    "isActive": true,
-    "createdAt": "...",
-    "updatedAt": "..."
-  }],
+  "data": [
+    {
+      "id": "uuid",
+      "code": "PROD-001",
+      "description": "Servicio de consultoría",
+      "unitPrice": 100,
+      "isActive": true,
+      "createdAt": "...",
+      "updatedAt": "..."
+    }
+  ],
   "meta": { "page": 1, "limit": 20, "total": 3, "totalPages": 1 }
 }
 ```
@@ -580,13 +735,13 @@ Series activas de documentos por empresa (catálogo local en `document_series`).
 
 **Query params (todos opcionales):**
 
-| Param | Tipo | Default | Descripción |
-|-------|------|---------|-------------|
-| `page` | int | `1` | Página |
-| `limit` | int | `20` | Máx `100` |
-| `q` | string | — | Búsqueda por `serie` (ILIKE) |
-| `docType` | string | — | Tipo SUNAT: `01`, `03`, `07`, `08` |
-| `isActive` | boolean | — | Si se omite, devuelve activas e inactivas |
+| Param      | Tipo    | Default | Descripción                               |
+| ---------- | ------- | ------- | ----------------------------------------- |
+| `page`     | int     | `1`     | Página                                    |
+| `limit`    | int     | `20`    | Máx `100`                                 |
+| `q`        | string  | —       | Búsqueda por `serie` (ILIKE)              |
+| `docType`  | string  | —       | Tipo SUNAT: `01`, `03`, `07`, `08`        |
+| `isActive` | boolean | —       | Si se omite, devuelve activas e inactivas |
 
 **Response `200`:**
 
@@ -599,7 +754,7 @@ Series activas de documentos por empresa (catálogo local en `document_series`).
       "serie": "B001",
       "correlativo": 5,
       "isActive": true,
-      "createdAt": "...",
+      "createdAt": "..."
     }
   ],
   "meta": { "page": 1, "limit": 20, "total": 1, "totalPages": 1 }
@@ -643,7 +798,10 @@ function productToItemInput(p: Product, cantidad: number) {
 // Ejemplo boleta
 await fetch('/v1/boletas', {
   method: 'POST',
-  headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+  headers: {
+    Authorization: `Bearer ${token}`,
+    'Content-Type': 'application/json',
+  },
   body: JSON.stringify({
     serie: 'B001',
     moneda: 'PEN',
@@ -674,18 +832,18 @@ Distinto de `voided` (anulación comunicada a SUNAT vía RC código 3 o RA).
 }
 ```
 
-| Campo | Obligatorio | Notas |
-|-------|-------------|-------|
-| `documentIds` | Sí | UUID[] de documentos |
-| `cancelReason` | No | Máx 500 caracteres |
+| Campo          | Obligatorio | Notas                |
+| -------------- | ----------- | -------------------- |
+| `documentIds`  | Sí          | UUID[] de documentos |
+| `cancelReason` | No          | Máx 500 caracteres   |
 
 El servidor guarda en `payload.cancellation`:
 
-| Campo | Origen |
-|-------|--------|
-| `cancelledBy` | UUID del usuario JWT |
-| `cancelledAt` | ISO-8601 UTC al momento de la baja |
-| `cancelReason` | Body o `null` |
+| Campo          | Origen                             |
+| -------------- | ---------------------------------- |
+| `cancelledBy`  | UUID del usuario JWT               |
+| `cancelledAt`  | ISO-8601 UTC al momento de la baja |
+| `cancelReason` | Body o `null`                      |
 
 **Validación:** cada id debe ser `03`/`07`/`08`, `status = signed`, `daily_summary_id` null, misma empresa.
 
@@ -693,18 +851,20 @@ El servidor guarda en `payload.cancellation`:
 
 ```json
 {
-  "cancelled": [{
-    "id": "...",
-    "docType": "03",
-    "serie": "B001",
-    "correlativo": 5,
-    "status": "cancelled",
-    "cancellation": {
-      "cancelledBy": "uuid-usuario",
-      "cancelledAt": "2026-05-27T18:30:00.000Z",
-      "cancelReason": "Emitida por error"
+  "cancelled": [
+    {
+      "id": "...",
+      "docType": "03",
+      "serie": "B001",
+      "correlativo": 5,
+      "status": "cancelled",
+      "cancellation": {
+        "cancelledBy": "uuid-usuario",
+        "cancelledAt": "2026-05-27T18:30:00.000Z",
+        "cancelReason": "Emitida por error"
+      }
     }
-  }],
+  ],
   "count": 1
 }
 ```
@@ -721,17 +881,17 @@ Cabeceras sin `payload` completo. Para ítems → detalle por id.
 
 **Query params (todos opcionales):**
 
-| Param | Tipo | Default | Descripción |
-|-------|------|---------|-------------|
-| `issueDate` | `YYYY-MM-DD` | — | Día exacto (prioridad sobre rango) |
-| `from` | `YYYY-MM-DD` | — | Inicio rango |
-| `to` | `YYYY-MM-DD` | — | Fin rango |
-| `docType` | `01`\|`03`\|`07`\|`08` | — | Tipo comprobante |
-| `status` | string | — | `signed`, `accepted`, `voided`, etc. |
-| `serie` | string | — | ej. `B001` |
-| `pendingRc` | boolean | — | `true` = signed sin RC (03/07/08) |
-| `page` | int | `1` | Página |
-| `limit` | int | `20` | Máx `100` |
+| Param       | Tipo                   | Default | Descripción                          |
+| ----------- | ---------------------- | ------- | ------------------------------------ |
+| `issueDate` | `YYYY-MM-DD`           | —       | Día exacto (prioridad sobre rango)   |
+| `from`      | `YYYY-MM-DD`           | —       | Inicio rango                         |
+| `to`        | `YYYY-MM-DD`           | —       | Fin rango                            |
+| `docType`   | `01`\|`03`\|`07`\|`08` | —       | Tipo comprobante                     |
+| `status`    | string                 | —       | `signed`, `accepted`, `voided`, etc. |
+| `serie`     | string                 | —       | ej. `B001`                           |
+| `pendingRc` | boolean                | —       | `true` = signed sin RC (03/07/08)    |
+| `page`      | int                    | `1`     | Página                               |
+| `limit`     | int                    | `20`    | Máx `100`                            |
 
 **Response `200`:**
 
@@ -786,7 +946,14 @@ Incluye **`payload`** (cliente, items, totals, documentoAfectado).
   "dailySummaryId": "...",
   "payload": {
     "cliente": { "tipoDoc": "6", "numDoc": "...", "razonSocial": "..." },
-    "items": [{ "codigo": "...", "descripcion": "...", "cantidad": 1, "precioUnitario": 100 }],
+    "items": [
+      {
+        "codigo": "...",
+        "descripcion": "...",
+        "cantidad": 1,
+        "precioUnitario": 100
+      }
+    ],
     "totals": { "subtotal": 100, "igvTotal": 18, "total": 118 },
     "moneda": "PEN"
   },
@@ -863,7 +1030,10 @@ POST /daily-summaries/:id/status               → id del RA en respuesta
 {
   "statusCode": 400,
   "message": [
-    { "property": "serie", "constraints": { "isNotEmpty": "serie should not be empty" } }
+    {
+      "property": "serie",
+      "constraints": { "isNotEmpty": "serie should not be empty" }
+    }
   ],
   "error": "Bad Request"
 }
@@ -898,9 +1068,7 @@ Token inválido o documento de otra empresa.
 const BASE = '/v1';
 
 export class BillingApi {
-  constructor(
-    private getToken: () => string | null,
-  ) {}
+  constructor(private getToken: () => string | null) {}
 
   private headers(json = true): HeadersInit {
     const h: Record<string, string> = {};
@@ -922,15 +1090,15 @@ export class BillingApi {
     const qs = new URLSearchParams(
       Object.entries(params).map(([k, v]) => [k, String(v)]),
     );
-    return fetch(`${BASE}/documents?${qs}`, { headers: this.headers(false) }).then(
-      (r) => r.json(),
-    );
+    return fetch(`${BASE}/documents?${qs}`, {
+      headers: this.headers(false),
+    }).then((r) => r.json());
   }
 
   getDocument(id: string) {
-    return fetch(`${BASE}/documents/${id}`, { headers: this.headers(false) }).then(
-      (r) => r.json(),
-    );
+    return fetch(`${BASE}/documents/${id}`, {
+      headers: this.headers(false),
+    }).then((r) => r.json());
   }
 
   createBoleta(body: unknown) {
@@ -1010,22 +1178,22 @@ Tipos completos: [frontend-tipos-api.md](../.cursor/skills/sunat-fe/frontend-tip
 
 ## Pendiente (no expuesto aún)
 
-| Feature | Estado |
-|---------|--------|
-| `GET /daily-summaries` (listado) | Backlog |
-| `customerId` / `productId` en emisión | Backlog |
-| RC altas por whitelist `documentIds` | Backlog (hoy: auto todas las `signed`) |
-| Swagger / OpenAPI | Sprint 4 |
+| Feature                               | Estado                                 |
+| ------------------------------------- | -------------------------------------- |
+| `GET /daily-summaries` (listado)      | Backlog                                |
+| `customerId` / `productId` en emisión | Backlog                                |
+| RC altas por whitelist `documentIds`  | Backlog (hoy: auto todas las `signed`) |
+| Swagger / OpenAPI                     | Sprint 4                               |
 
 ---
 
 ## Fuente de verdad en código
 
-| Contrato | Archivo |
-|----------|---------|
-| Query listado | `src/documents/dto/list-documents-query.dto.ts` |
-| Emisión | `src/documents/dto/create-*.dto.ts` |
-| Responses | `src/documents/types/document-response.types.ts` |
-| Routes | `src/documents/documents.controller.ts`, `src/auth/auth.controller.ts` |
-| Catálogo clientes | `src/customers/dto/*`, `src/customers/customers.controller.ts` |
-| Catálogo productos | `src/products/dto/*`, `src/products/products.controller.ts` |
+| Contrato           | Archivo                                                                |
+| ------------------ | ---------------------------------------------------------------------- |
+| Query listado      | `src/documents/dto/list-documents-query.dto.ts`                        |
+| Emisión            | `src/documents/dto/create-*.dto.ts`                                    |
+| Responses          | `src/documents/types/document-response.types.ts`                       |
+| Routes             | `src/documents/documents.controller.ts`, `src/auth/auth.controller.ts` |
+| Catálogo clientes  | `src/customers/dto/*`, `src/customers/customers.controller.ts`         |
+| Catálogo productos | `src/products/dto/*`, `src/products/products.controller.ts`            |

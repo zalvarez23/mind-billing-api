@@ -14,6 +14,8 @@ import { Company } from '../companies/entities/company.entity';
 import { User } from '../users/entities/user.entity';
 import { CreateBoletaDto } from './dto/create-boleta.dto';
 import { CloseDailySummaryDto } from './dto/close-daily-summary.dto';
+import { PreviewCloseDailySummaryDto } from './dto/preview-close-daily-summary.dto';
+import { PreviewVoidDailySummaryDto } from './dto/preview-void-daily-summary.dto';
 import { VoidDailySummaryDto } from './dto/void-daily-summary.dto';
 import { CreateInvoiceDto } from './dto/create-invoice.dto';
 import { CreateNoteDto } from './dto/create-note.dto';
@@ -116,6 +118,22 @@ export class VoidedDocumentsController {
 @UseGuards(JwtAuthGuard, CompanyMatchGuard)
 export class DailySummariesController {
   constructor(private readonly dailySummariesService: DailySummariesService) {}
+
+  @Post('preview')
+  previewClose(
+    @CurrentCompany() company: Company,
+    @Body() dto: PreviewCloseDailySummaryDto,
+  ) {
+    return this.dailySummariesService.previewCloseDailySummary(company, dto);
+  }
+
+  @Post('void/preview')
+  previewVoid(
+    @CurrentCompany() company: Company,
+    @Body() dto: PreviewVoidDailySummaryDto,
+  ) {
+    return this.dailySummariesService.previewVoidDailySummary(company, dto);
+  }
 
   @Post()
   close(

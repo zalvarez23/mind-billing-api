@@ -18,6 +18,8 @@ export const validationSchema = Joi.object({
   DB_SEED_ON_START: Joi.string().valid('true', 'false', 'auto').default('auto'),
   JWT_SECRET: Joi.string().min(16).required(),
   JWT_EXPIRES_IN: Joi.string().default('8h'),
+  /** Clave para POST /admin/companies (header X-Admin-Api-Key). */
+  ADMIN_API_KEY: Joi.string().min(32).required(),
   STORAGE_PATH: Joi.string().default('./storage'),
   SUNAT_BILL_SERVICE_BETA: Joi.string().uri().optional(),
   SUNAT_BILL_SERVICE_PROD: Joi.string().uri().optional(),

@@ -8,6 +8,8 @@ import jwtConfig from './config/jwt.config';
 import sunatConfig from './config/sunat.config';
 import { validationSchema } from './config/validation.schema';
 import { DatabaseModule } from './database/database.module';
+import { CertificatesModule } from './certificates/certificates.module';
+import { CompaniesModule } from './companies/companies.module';
 import { CustomersModule } from './customers/customers.module';
 import { DocumentsModule } from './documents/documents.module';
 import { ProductsModule } from './products/products.module';
@@ -41,6 +43,8 @@ import { entities } from './database/entities';
     }),
     DatabaseModule,
     AuthModule,
+    CompaniesModule,
+    CertificatesModule,
     CustomersModule,
     ProductsModule,
     DocumentsModule,

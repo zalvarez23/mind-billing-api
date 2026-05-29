@@ -14,7 +14,15 @@ import {
 } from '../sunat/bill-service.client';
 import { classifySunatSubmissionError } from '../sunat/sunat-error.util';
 import { CloseDailySummaryDto } from './dto/close-daily-summary.dto';
+import { PreviewCloseDailySummaryDto } from './dto/preview-close-daily-summary.dto';
+import { PreviewVoidDailySummaryDto } from './dto/preview-void-daily-summary.dto';
 import { VoidDailySummaryDto } from './dto/void-daily-summary.dto';
+import {
+  aggregatePreviewTotals,
+  paginateArray,
+  toPreviewDocumentItem,
+} from './daily-summaries-preview.util';
+import type { DailySummaryPreviewResponse } from './types/daily-summary-preview.types';
 import {
   buildSummaryLine,
   finalizeBoletaVoid,
@@ -56,6 +64,126 @@ export class DailySummariesService {
     private readonly billServiceClient: BillServiceClient,
   ) {}
 
+  async previewCloseDailySummary(
+    company: Company,
+    dto: PreviewCloseDailySummaryDto,
+  ): Promise<DailySummaryPreviewResponse> {
+    const referenceDate = dto.referenceDate ?? this.todayIsoDate();
+    const issueDate = dto.issueDate ?? this.todayIsoDate();
+    const page = dto.page ?? 1;
+    const limit = dto.limit ?? 20;
+
+    const { documents, blockedCount } = await this.findAltaRcDocuments(
+      company.id,
+      referenceDate,
+    );
+
+    const warnings = await this.collectPendingRcWarnings(company.id, issueDate);
+
+    if (documents.length === 0) {
+      return this.buildEmptyAltaPreview(
+        referenceDate,
+        issueDate,
+        blockedCount,
+        warnings,
+        page,
+        limit,
+      );
+    }
+
+    const issueDateYmd = issueDate.replace(/-/g, '');
+    const correlativo = await this.nextRcCorrelativo(
+      company.id,
+      issueDate,
+      this.dailySummaryRepository,
+    );
+    const lines = documents.map((doc, index) =>
+      buildSummaryLine(doc, index + 1, ALTA_CONDITION_CODE),
+    );
+    const signedXml = await this.rcXmlHelper.buildSignedRcXml(
+      company,
+      {
+        ruc: company.ruc,
+        businessName: company.businessName,
+        referenceDate,
+        issueDate,
+        lines,
+      },
+      issueDateYmd,
+      correlativo,
+    );
+
+    return this.buildRcPreviewResponse({
+      variant: 'alta',
+      referenceDate,
+      issueDate,
+      conditionCode: ALTA_CONDITION_CODE,
+      correlativo,
+      documents,
+      lines,
+      signedXml,
+      blockedCount,
+      warnings,
+      page,
+      limit,
+      includeXml: dto.includeXml === true,
+    });
+  }
+
+  async previewVoidDailySummary(
+    company: Company,
+    dto: PreviewVoidDailySummaryDto,
+  ): Promise<DailySummaryPreviewResponse> {
+    const issueDate = dto.issueDate ?? this.todayIsoDate();
+    const page = dto.page ?? 1;
+    const limit = dto.limit ?? 20;
+
+    const boletas = await this.loadVoidBoletas(company.id, dto);
+    const referenceDate = this.resolveVoidReferenceDate(
+      dto.referenceDate,
+      boletas[0]?.issueDate,
+    );
+
+    const warnings = await this.collectPendingRcWarnings(company.id, issueDate);
+
+    const issueDateYmd = issueDate.replace(/-/g, '');
+    const correlativo = await this.nextRcCorrelativo(
+      company.id,
+      issueDate,
+      this.dailySummaryRepository,
+    );
+    const lines = boletas.map((doc, index) =>
+      buildSummaryLine(doc, index + 1, VOID_CONDITION_CODE),
+    );
+    const signedXml = await this.rcXmlHelper.buildSignedRcXml(
+      company,
+      {
+        ruc: company.ruc,
+        businessName: company.businessName,
+        referenceDate,
+        issueDate,
+        lines,
+      },
+      issueDateYmd,
+      correlativo,
+    );
+
+    return this.buildRcPreviewResponse({
+      variant: 'void',
+      referenceDate,
+      issueDate,
+      conditionCode: VOID_CONDITION_CODE,
+      correlativo,
+      documents: boletas,
+      lines,
+      signedXml,
+      warnings,
+      page,
+      limit,
+      includeXml: dto.includeXml === true,
+    });
+  }
+
   async closeDailySummary(
     company: Company,
     user: User,
@@ -84,15 +212,11 @@ export class DailySummariesService {
       });
 
       if (documents.length === 0) {
-        const blockedCount = await documentRepo.count({
-          where: {
-            companyId: company.id,
-            docType: In([...RC_DOC_TYPES]),
-            status: DocumentStatus.SIGNED,
-            issueDate: referenceDate,
-            dailySummaryId: Not(IsNull()),
-          },
-        });
+        const blockedCount = await this.countBlockedAltaRcDocuments(
+          company.id,
+          referenceDate,
+          documentRepo,
+        );
 
         if (blockedCount > 0) {
           throw new BadRequestException(
@@ -172,48 +296,12 @@ export class DailySummariesService {
     const issueDate = dto.issueDate ?? this.todayIsoDate();
     const issueDateYmd = issueDate.replace(/-/g, '');
 
-    const boletas = await this.documentRepository.find({
-      where: {
-        id: In(dto.documentIds),
-        companyId: company.id,
-        docType: BOLETA_DOC_TYPE,
-        status: DocumentStatus.ACCEPTED,
-      },
-    });
-
-    if (boletas.length !== dto.documentIds.length) {
-      throw new BadRequestException(
-        'All documentIds must be accepted boletas (03) of this company',
-      );
-    }
+    const boletas = await this.loadVoidBoletas(company.id, dto);
 
     const referenceDate = this.resolveVoidReferenceDate(
       dto.referenceDate,
       boletas[0]?.issueDate,
     );
-
-    for (const boleta of boletas) {
-      if (!boleta.issueDate) {
-        throw new BadRequestException(
-          `Boleta ${boleta.serie}-${boleta.correlativo} has no issueDate`,
-        );
-      }
-      if (boleta.issueDate !== referenceDate) {
-        throw new BadRequestException(
-          `All boletas must share referenceDate ${referenceDate}. Boleta ${boleta.serie}-${boleta.correlativo} was issued on ${boleta.issueDate}.`,
-        );
-      }
-      if (!boleta.dailySummaryId) {
-        throw new BadRequestException(
-          `Boleta ${boleta.serie}-${boleta.correlativo} was never accepted via RC`,
-        );
-      }
-      if (hasRcVoidInProgress(boleta.payload)) {
-        throw new BadRequestException(
-          `Boleta ${boleta.serie}-${boleta.correlativo} already has a void RC in progress`,
-        );
-      }
-    }
 
     const prepared = await this.dataSource.transaction(async (manager) => {
       const documentRepo = manager.getRepository(Document);
@@ -497,6 +585,213 @@ export class DailySummariesService {
       doc.dailySummaryId = null;
       await this.documentRepository.save(doc);
     }
+  }
+
+  private async findAltaRcDocuments(
+    companyId: string,
+    referenceDate: string,
+  ): Promise<{ documents: Document[]; blockedCount: number }> {
+    const documents = await this.documentRepository.find({
+      where: {
+        companyId,
+        docType: In([...RC_DOC_TYPES]),
+        status: DocumentStatus.SIGNED,
+        issueDate: referenceDate,
+        dailySummaryId: IsNull(),
+      },
+      order: { docType: 'ASC', serie: 'ASC', correlativo: 'ASC' },
+    });
+
+    const blockedCount = await this.countBlockedAltaRcDocuments(
+      companyId,
+      referenceDate,
+      this.documentRepository,
+    );
+
+    return { documents, blockedCount };
+  }
+
+  private async countBlockedAltaRcDocuments(
+    companyId: string,
+    referenceDate: string,
+    documentRepo: Repository<Document>,
+  ): Promise<number> {
+    return documentRepo.count({
+      where: {
+        companyId,
+        docType: In([...RC_DOC_TYPES]),
+        status: DocumentStatus.SIGNED,
+        issueDate: referenceDate,
+        dailySummaryId: Not(IsNull()),
+      },
+    });
+  }
+
+  private async loadVoidBoletas(
+    companyId: string,
+    dto: VoidDailySummaryDto,
+  ): Promise<Document[]> {
+    const boletas = await this.documentRepository.find({
+      where: {
+        id: In(dto.documentIds),
+        companyId,
+        docType: BOLETA_DOC_TYPE,
+        status: DocumentStatus.ACCEPTED,
+      },
+      order: { serie: 'ASC', correlativo: 'ASC' },
+    });
+
+    if (boletas.length !== dto.documentIds.length) {
+      throw new BadRequestException(
+        'All documentIds must be accepted boletas (03) of this company',
+      );
+    }
+
+    const referenceDate = this.resolveVoidReferenceDate(
+      dto.referenceDate,
+      boletas[0]?.issueDate,
+    );
+
+    for (const boleta of boletas) {
+      if (!boleta.issueDate) {
+        throw new BadRequestException(
+          `Boleta ${boleta.serie}-${boleta.correlativo} has no issueDate`,
+        );
+      }
+      if (boleta.issueDate !== referenceDate) {
+        throw new BadRequestException(
+          `All boletas must share referenceDate ${referenceDate}. Boleta ${boleta.serie}-${boleta.correlativo} was issued on ${boleta.issueDate}.`,
+        );
+      }
+      if (!boleta.dailySummaryId) {
+        throw new BadRequestException(
+          `Boleta ${boleta.serie}-${boleta.correlativo} was never accepted via RC`,
+        );
+      }
+      if (hasRcVoidInProgress(boleta.payload)) {
+        throw new BadRequestException(
+          `Boleta ${boleta.serie}-${boleta.correlativo} already has a void RC in progress`,
+        );
+      }
+    }
+
+    return boletas;
+  }
+
+  private async collectPendingRcWarnings(
+    companyId: string,
+    issueDate: string,
+  ): Promise<DailySummaryPreviewResponse['warnings']> {
+    const pendingWithTicket = await this.dailySummaryRepository.findOne({
+      where: {
+        companyId,
+        issueDate,
+        summaryType: DailySummaryType.RC,
+        status: In([
+          DailySummaryStatus.PROCESSING,
+          DailySummaryStatus.FAILED,
+          DailySummaryStatus.SUBMITTED,
+        ]),
+        ticket: Not(IsNull()),
+      },
+      order: { correlativo: 'DESC' },
+    });
+
+    if (!pendingWithTicket) {
+      return [];
+    }
+
+    return [
+      {
+        code: 'PENDING_RC',
+        message: `RC ${pendingWithTicket.summaryCode} already sent to SUNAT (ticket ${pendingWithTicket.ticket}). Resolve it before creating another RC.`,
+        dailySummaryId: pendingWithTicket.id,
+        ticket: pendingWithTicket.ticket ?? undefined,
+        status: pendingWithTicket.status,
+      },
+    ];
+  }
+
+  private buildEmptyAltaPreview(
+    referenceDate: string,
+    issueDate: string,
+    blockedCount: number,
+    warnings: DailySummaryPreviewResponse['warnings'],
+    page: number,
+    limit: number,
+  ): DailySummaryPreviewResponse {
+    const emptyPage = paginateArray([], page, limit);
+
+    return {
+      variant: 'alta',
+      summaryType: 'RC',
+      referenceDate,
+      issueDate,
+      summaryCode: null,
+      correlativo: null,
+      conditionCode: ALTA_CONDITION_CODE,
+      documentCount: 0,
+      ...(blockedCount > 0 ? { blockedDocumentCount: blockedCount } : {}),
+      totals: null,
+      files: null,
+      lines: null,
+      xml: null,
+      warnings,
+      documents: {
+        data: [],
+        meta: emptyPage.meta,
+      },
+    };
+  }
+
+  private buildRcPreviewResponse(input: {
+    variant: 'alta' | 'void';
+    referenceDate: string;
+    issueDate: string;
+    conditionCode: string;
+    correlativo: number;
+    documents: Document[];
+    lines: ReturnType<typeof buildSummaryLine>[];
+    signedXml: SignedRcXmlResult;
+    blockedCount?: number;
+    warnings: DailySummaryPreviewResponse['warnings'];
+    page: number;
+    limit: number;
+    includeXml: boolean;
+  }): DailySummaryPreviewResponse {
+    const previewItems = input.documents.map((doc, index) =>
+      toPreviewDocumentItem(doc, input.lines[index]),
+    );
+    const paginated = paginateArray(previewItems, input.page, input.limit);
+    const amountTotals = aggregatePreviewTotals(input.lines);
+    const xml = input.signedXml.xml;
+
+    return {
+      variant: input.variant,
+      summaryType: 'RC',
+      referenceDate: input.referenceDate,
+      issueDate: input.issueDate,
+      summaryCode: input.signedXml.summaryCode,
+      correlativo: input.correlativo,
+      conditionCode: input.conditionCode,
+      documentCount: input.documents.length,
+      ...(input.blockedCount !== undefined && input.blockedCount > 0
+        ? { blockedDocumentCount: input.blockedCount }
+        : {}),
+      totals: {
+        documentCount: input.documents.length,
+        ...amountTotals,
+      },
+      files: {
+        xmlFileName: input.signedXml.xmlFileName,
+        zipFileName: input.signedXml.xmlFileName.replace(/\.xml$/i, '.zip'),
+        xmlSizeBytes: Buffer.byteLength(xml, 'utf8'),
+      },
+      lines: input.lines,
+      xml: input.includeXml ? xml : null,
+      warnings: input.warnings,
+      documents: paginated,
+    };
   }
 
   private async assertNoPendingRc(

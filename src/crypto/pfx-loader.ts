@@ -1,4 +1,3 @@
-import { readFile } from 'fs/promises';
 import * as forge from 'node-forge';
 
 export interface CertificateMaterial {
@@ -6,12 +5,13 @@ export interface CertificateMaterial {
   certificatePem: string;
 }
 
-export async function loadPfxFromFile(
-  pfxPath: string,
+export function loadPfxFromBuffer(
+  pfxBuffer: Buffer,
   password: string,
-): Promise<CertificateMaterial> {
-  const pfxBuffer = await readFile(pfxPath);
-  const pfxAsn1 = forge.asn1.fromDer(forge.util.createBuffer(pfxBuffer));
+): CertificateMaterial {
+  const pfxAsn1 = forge.asn1.fromDer(
+    forge.util.createBuffer(pfxBuffer.toString('binary')),
+  );
   const pfx = forge.pkcs12.pkcs12FromAsn1(pfxAsn1, password);
 
   const certBags = pfx.getBags({ bagType: forge.pki.oids.certBag });
@@ -22,7 +22,7 @@ export async function loadPfxFromFile(
   const privateKey = keyBags[forge.pki.oids.pkcs8ShroudedKeyBag]?.[0]?.key;
 
   if (!cert || !privateKey) {
-    throw new Error(`Invalid PFX: ${pfxPath}`);
+    throw new Error('Invalid PFX buffer');
   }
 
   return {

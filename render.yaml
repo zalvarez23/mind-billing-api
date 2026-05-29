@@ -37,6 +37,9 @@ services:
         generateValue: true
       - key: JWT_EXPIRES_IN
         value: 8h
+      # POST /v1/admin/companies — header X-Admin-Api-Key
+      - key: ADMIN_API_KEY
+        generateValue: true
       # SUNAT beta (equivalente a .env local)
       - key: SUNAT_BILL_SERVICE_BETA
         value: https://e-beta.sunat.gob.pe/ol-ti-itcpfegem-beta/billService

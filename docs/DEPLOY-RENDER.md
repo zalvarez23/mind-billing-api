@@ -100,7 +100,7 @@ Tras cambiar `render.yaml`, haz push a `main` o sincroniza el blueprint; Render 
 ## Certificados SUNAT (beta / prod)
 
 - Rutas PFX bajo `STORAGE_PATH` (disco **efímero** en Render: se pierde al redeploy salvo que uses disco persistente o S3).
-- En beta, el seed puede generar `certs/dev-beta.pfx` si no existe.
+- En beta, el seed genera el PFX en memoria y lo guarda en `certificates.pfx_content` (no depende de disco).
 - En producción: sube el `.pfx` al volumen o inserta en `certificates` y asegura que el archivo exista en `STORAGE_PATH`.
 
 ## Plan Free — limitaciones
