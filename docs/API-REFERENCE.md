@@ -336,6 +336,38 @@ Firma local. Estado resultante: **`signed`**. Debe incluirse en RC antes de fin 
 }
 ```
 
+**Consumidor final (sin DNI)** — SUNAT permite omitir identificación real si el total es **≤ S/ 700.00** y el cliente no la solicita. El objeto `cliente` sigue siendo **obligatorio** en el API (no hay valor por defecto).
+
+| Campo         | Valor     | Notas                                              |
+| ------------- | --------- | -------------------------------------------------- |
+| `tipoDoc`     | `"0"`     | Catálogo 06: DOC.TRIB.NO.DOM.SIN.RUC               |
+| `numDoc`      | `"-"`     | Guión cuando no hay número (alternativa: `00000000`) |
+| `razonSocial` | `"VARIOS"` | Nombre genérico del adquirente                    |
+
+Si el total **supera S/ 700** o el cliente **pide** identificarse, usar DNI (`"1"`) o RUC (`"6"`) real. SUNAT puede rechazar con error **2396** si el monto es mayor a S/ 700 sin tipo y número válidos. El API **no valida** ese umbral en servidor; el frontend debe aplicar la regla.
+
+```json
+{
+  "serie": "B001",
+  "moneda": "PEN",
+  "cliente": {
+    "tipoDoc": "0",
+    "numDoc": "-",
+    "razonSocial": "VARIOS"
+  },
+  "items": [
+    {
+      "codigo": "PROD-1",
+      "descripcion": "Venta mostrador",
+      "cantidad": 1,
+      "precioUnitario": 50
+    }
+  ]
+}
+```
+
+En el **RC**, cada línea reutiliza el `cliente` guardado en el payload de la boleta (`AdditionalAccountID` = tipo, `CustomerAssignedAccountID` = número). Validar en beta/homolog antes de producción.
+
 **Response `200`:**
 
 ```json
@@ -617,7 +649,7 @@ Adquirientes reutilizables por empresa. Al emitir factura/boleta, el frontend ma
 | `page`     | int     | `1`     | Página                                        |
 | `limit`    | int     | `20`    | Máx `100`                                     |
 | `q`        | string  | —       | Búsqueda en `docNumber` y `legalName` (ILIKE) |
-| `docType`  | string  | —       | Catálogo 06: `1` DNI, `6` RUC, etc.           |
+| `docType`  | string  | —       | Catálogo 06: `0` sin identificar, `1` DNI, `6` RUC, etc. |
 | `isActive` | boolean | —       | Si se omite, devuelve activos e inactivos     |
 
 **Response `200`:** `{ data: Customer[], meta: { page, limit, total, totalPages } }`
@@ -888,8 +920,9 @@ Cabeceras sin `payload` completo. Para ítems → detalle por id.
 | `to`        | `YYYY-MM-DD`           | —       | Fin rango                            |
 | `docType`   | `01`\|`03`\|`07`\|`08` | —       | Tipo comprobante                     |
 | `status`    | string                 | —       | `signed`, `accepted`, `voided`, etc. |
-| `serie`     | string                 | —       | ej. `B001`                           |
+| `serie`     | string                 | —       | ej. `B001` (match exacto)            |
 | `pendingRc` | boolean                | —       | `true` = signed sin RC (03/07/08)    |
+| `q`         | string                 | —       | ILIKE en `serie`, `correlativo`, `serie-correlativo`, `cliente.numDoc`, `cliente.razonSocial`, `id` |
 | `page`      | int                    | `1`     | Página                               |
 | `limit`     | int                    | `20`    | Máx `100`                            |
 
@@ -926,6 +959,9 @@ Cabeceras sin `payload` completo. Para ítems → detalle por id.
 GET /v1/documents?issueDate=2026-05-26
 GET /v1/documents?issueDate=2026-05-26&pendingRc=true
 GET /v1/documents?from=2026-05-01&to=2026-05-31&docType=03&status=accepted&page=1&limit=10
+GET /v1/documents?q=B001-5
+GET /v1/documents?q=20100066603&docType=03
+GET /v1/documents?q=VARIOS&status=signed
 ```
 
 ---

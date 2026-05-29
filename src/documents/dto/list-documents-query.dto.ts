@@ -8,6 +8,7 @@ import {
   IsOptional,
   IsString,
   Max,
+  MaxLength,
   Min,
 } from 'class-validator';
 import { DocumentStatus } from '../../common/enums';
@@ -47,6 +48,13 @@ export class ListDocumentsQueryDto {
   @Transform(({ value }) => value === 'true' || value === true)
   @IsBoolean()
   pendingRc?: boolean;
+
+  /** Búsqueda en serie, correlativo, serie-correlativo, cliente (numDoc, razonSocial) e id. */
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  @Transform(({ value }) => (typeof value === 'string' ? value.trim() : value))
+  q?: string;
 
   @IsOptional()
   @Type(() => Number)

@@ -637,6 +637,20 @@ export class DocumentsService {
         });
     }
 
+    if (query.q) {
+      qb.andWhere(
+        `(
+          doc.serie ILIKE :q
+          OR CAST(doc.correlativo AS TEXT) ILIKE :q
+          OR CONCAT(doc.serie, '-', doc.correlativo) ILIKE :q
+          OR doc.payload->'cliente'->>'numDoc' ILIKE :q
+          OR doc.payload->'cliente'->>'razonSocial' ILIKE :q
+          OR CAST(doc.id AS TEXT) ILIKE :q
+        )`,
+        { q: `%${query.q}%` },
+      );
+    }
+
     qb.orderBy('doc.issueDate', 'DESC')
       .addOrderBy('doc.serie', 'ASC')
       .addOrderBy('doc.correlativo', 'DESC');
