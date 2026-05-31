@@ -6,6 +6,8 @@ export interface CompanyResponse {
   businessName: string;
   tradeName: string | null;
   address: string | null;
+  email: string | null;
+  phone: string | null;
   ubigeo: string | null;
   sunatEnvironment: SunatEnvironment;
   solUsername: string | null;

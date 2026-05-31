@@ -34,6 +34,12 @@ export class Company {
   @Column({ type: 'varchar', length: 500, nullable: true })
   address: string | null;
 
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  email: string | null;
+
+  @Column({ type: 'varchar', length: 50, nullable: true })
+  phone: string | null;
+
   @Column({ type: 'varchar', length: 6, nullable: true })
   ubigeo: string | null;
 

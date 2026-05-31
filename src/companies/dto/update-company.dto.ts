@@ -1,52 +1,43 @@
-import { Type } from 'class-transformer';
 import {
   IsEmail,
   IsEnum,
-  IsNotEmpty,
   IsOptional,
   IsString,
   Matches,
   MaxLength,
-  ValidateNested,
 } from 'class-validator';
 import { SunatEnvironment } from '../../common/enums';
-import { CreateCompanyInitialUserDto } from './create-company-initial-user.dto';
 
-export class CreateCompanyDto {
+export class UpdateCompanyDto {
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  @Matches(/^\d{11}$/, { message: 'ruc must be 11 digits' })
-  ruc: string;
-
-  @IsString()
-  @IsNotEmpty()
   @MaxLength(255)
-  businessName: string;
+  businessName?: string;
 
   @IsOptional()
   @IsString()
   @MaxLength(255)
-  tradeName?: string;
+  tradeName?: string | null;
 
   @IsOptional()
   @IsString()
   @MaxLength(500)
-  address?: string;
+  address?: string | null;
 
   @IsOptional()
   @IsEmail()
   @MaxLength(255)
-  email?: string;
+  email?: string | null;
 
   @IsOptional()
   @IsString()
   @MaxLength(50)
-  phone?: string;
+  phone?: string | null;
 
   @IsOptional()
   @IsString()
   @Matches(/^\d{6}$/)
-  ubigeo?: string;
+  ubigeo?: string | null;
 
   @IsOptional()
   @IsEnum(SunatEnvironment)
@@ -55,15 +46,10 @@ export class CreateCompanyDto {
   @IsOptional()
   @IsString()
   @MaxLength(100)
-  solUsername?: string;
+  solUsername?: string | null;
 
   @IsOptional()
   @IsString()
   @MaxLength(100)
-  solPassword?: string;
-
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => CreateCompanyInitialUserDto)
-  initialUser?: CreateCompanyInitialUserDto;
+  solPassword?: string | null;
 }

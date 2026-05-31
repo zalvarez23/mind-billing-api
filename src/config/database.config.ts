@@ -6,6 +6,7 @@ import {
   Sprint3NotesRa1710000000003,
   CreateProducts1710000000004,
   CertificatePfxContent1710000000005,
+  CompanyContact1710000000006,
 } from '../database/migrations';
 
 export default registerAs('database', () => ({
@@ -30,5 +31,6 @@ export default registerAs('database', () => ({
     Sprint3NotesRa1710000000003,
     CreateProducts1710000000004,
     CertificatePfxContent1710000000005,
+    CompanyContact1710000000006,
   ],
 }));

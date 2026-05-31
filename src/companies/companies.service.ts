@@ -13,6 +13,7 @@ import { DocumentSeries } from '../series/entities/document-series.entity';
 import { User } from '../users/entities/user.entity';
 import { toCompanyResponse } from './company.mapper';
 import { CreateCompanyDto } from './dto/create-company.dto';
+import { UpdateCompanyDto } from './dto/update-company.dto';
 import { Company } from './entities/company.entity';
 import {
   CompanyCreatedResponse,
@@ -31,6 +32,53 @@ export class CompaniesService {
     requesterCompanyId: string,
     id: string,
   ): Promise<CompanyResponse> {
+    const company = await this.findEntityOrThrow(requesterCompanyId, id);
+    return toCompanyResponse(company);
+  }
+
+  async update(
+    requesterCompanyId: string,
+    id: string,
+    dto: UpdateCompanyDto,
+  ): Promise<CompanyResponse> {
+    const company = await this.findEntityOrThrow(requesterCompanyId, id);
+
+    if (dto.businessName !== undefined) {
+      company.businessName = dto.businessName;
+    }
+    if (dto.tradeName !== undefined) {
+      company.tradeName = dto.tradeName;
+    }
+    if (dto.address !== undefined) {
+      company.address = dto.address;
+    }
+    if (dto.email !== undefined) {
+      company.email = dto.email;
+    }
+    if (dto.phone !== undefined) {
+      company.phone = dto.phone;
+    }
+    if (dto.ubigeo !== undefined) {
+      company.ubigeo = dto.ubigeo;
+    }
+    if (dto.sunatEnvironment !== undefined) {
+      company.sunatEnvironment = dto.sunatEnvironment;
+    }
+    if (dto.solUsername !== undefined) {
+      company.solUsername = dto.solUsername;
+    }
+    if (dto.solPassword !== undefined) {
+      company.solPassword = dto.solPassword;
+    }
+
+    const saved = await this.companyRepository.save(company);
+    return toCompanyResponse(saved);
+  }
+
+  private async findEntityOrThrow(
+    requesterCompanyId: string,
+    id: string,
+  ): Promise<Company> {
     if (id !== requesterCompanyId) {
       throw new NotFoundException('Company not found');
     }
@@ -43,7 +91,7 @@ export class CompaniesService {
       throw new NotFoundException('Company not found');
     }
 
-    return toCompanyResponse(company);
+    return company;
   }
 
   async create(dto: CreateCompanyDto): Promise<CompanyCreatedResponse> {
@@ -70,6 +118,8 @@ export class CompaniesService {
           businessName: dto.businessName,
           tradeName: dto.tradeName ?? null,
           address: dto.address ?? null,
+          email: dto.email ?? null,
+          phone: dto.phone ?? null,
           ubigeo: dto.ubigeo ?? null,
           sunatEnvironment,
           solUsername: dto.solUsername ?? null,

@@ -161,6 +161,8 @@ async function runSeedOnce(connection: DataSource): Promise<void> {
         businessName: 'EMPRESA DEV SAC',
         tradeName: 'Empresa Dev',
         address: 'Av. Dev 123, Lima',
+        email: 'facturacion@empresa-dev.test',
+        phone: '+51999999999',
         ubigeo: '150101',
         sunatEnvironment: SunatEnvironment.BETA,
         solUsername: '20000000001MODDATOS',

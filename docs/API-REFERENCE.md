@@ -60,6 +60,8 @@ Crea tenant: empresa + series por defecto (`F001`, `B001`, `FC01`, `BC01`, `FD01
   "businessName": "NUEVA EMPRESA SAC",
   "tradeName": "Nueva Empresa",
   "address": "Av. Principal 100",
+  "email": "contacto@nuevaempresa.test",
+  "phone": "+51987654321",
   "ubigeo": "150101",
   "sunatEnvironment": "beta",
   "solUsername": "20123456789MODDATOS",
@@ -76,6 +78,8 @@ Crea tenant: empresa + series por defecto (`F001`, `B001`, `FC01`, `BC01`, `FD01
 |-------|-------------|-------|
 | `ruc` | Sí | 11 dígitos, único |
 | `businessName` | Sí | |
+| `email` | No | Correo de contacto |
+| `phone` | No | Teléfono de contacto |
 | `initialUser` | No | Primer usuario para login (`POST /auth/login`) |
 | `sunatEnvironment` | No | Default `beta` |
 
@@ -115,6 +119,8 @@ Rutas protegidas con **JWT**. Solo puedes consultar **tu propia** empresa (`id` 
   "businessName": "EMPRESA DEV SAC",
   "tradeName": "Empresa Dev",
   "address": "Av. Dev 123, Lima",
+  "email": "facturacion@empresa-dev.test",
+  "phone": "+51999999999",
   "ubigeo": "150101",
   "sunatEnvironment": "beta",
   "solUsername": "20000000001MODDATOS",
@@ -142,6 +148,45 @@ const company = await res.json();
 ```
 
 **Diferencia con `GET /auth/me`:** `/auth/me` devuelve usuario + resumen de empresa; `/companies/:id` devuelve **todos** los campos de la empresa (`address`, `ubigeo`, `solUsername`, `hasSolPassword`, fechas).
+
+### `PATCH /v1/companies/:id` — Actualizar empresa
+
+**Headers:** `Authorization: Bearer <JWT>`.
+
+Solo puedes actualizar **tu propia** empresa (`id` = JWT). No se puede cambiar `ruc` ni `apiKey`.
+
+**Body (campos opcionales, parcial):**
+
+```json
+{
+  "businessName": "EMPRESA DEV SAC",
+  "tradeName": "Empresa Dev",
+  "address": "Av. Dev 123, Lima",
+  "email": "facturacion@empresa-dev.test",
+  "phone": "+51999999999",
+  "ubigeo": "150101",
+  "sunatEnvironment": "beta",
+  "solUsername": "20000000001MODDATOS",
+  "solPassword": "MODDATOS"
+}
+```
+
+| Campo | Notas |
+|-------|-------|
+| `email`, `phone`, `address`, … | Enviar `null` para limpiar el valor |
+| `solPassword` | Se guarda en BD; la respuesta sigue usando `hasSolPassword` |
+| `sunatEnvironment` | `beta` \| `homologacion` \| `production` |
+
+**Response `200`:** mismo shape que `GET /companies/:id`.
+
+```bash
+curl -X PATCH http://localhost:3000/v1/companies/$COMPANY_ID \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"contacto@miempresa.test","phone":"+51987654321"}'
+```
+
+**Errores:** `401` JWT inválido; `404` si `id` no es tu empresa; `400` validación (email inválido, ubigeo ≠ 6 dígitos).
 
 ---
 
@@ -191,6 +236,7 @@ Catálogo 06: `1` DNI, `6` RUC, etc.
 | POST   | `/auth/login`                 | Obtener JWT                                |
 | POST   | `/admin/companies`            | Alta empresa (header `X-Admin-Api-Key`)  |
 | GET    | `/companies/:id`              | Detalle empresa (JWT, solo la propia)    |
+| PATCH  | `/companies/:id`              | Actualizar empresa (JWT, solo la propia)   |
 | GET    | `/auth/me`                    | Usuario y empresa actual                   |
 | POST   | `/invoices`                   | Emitir factura + envío SUNAT               |
 | POST   | `/boletas`                    | Emitir boleta (firmada, pendiente RC)      |

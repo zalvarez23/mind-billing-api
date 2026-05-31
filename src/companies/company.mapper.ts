@@ -8,6 +8,8 @@ export function toCompanyResponse(company: Company): CompanyResponse {
     businessName: company.businessName,
     tradeName: company.tradeName,
     address: company.address,
+    email: company.email,
+    phone: company.phone,
     ubigeo: company.ubigeo,
     sunatEnvironment: company.sunatEnvironment,
     solUsername: company.solUsername,

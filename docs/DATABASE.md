@@ -69,6 +69,9 @@ erDiagram
 | `1710000000001-Sprint2Closure` | 2 | `sunat_submissions.error_message`; unique `(company_id, doc_type, serie, correlativo)` en documents |
 | `1710000000002-Sprint3BoletasRc` | 3 | Tabla `daily_summaries`; `documents.issue_date`, `documents.daily_summary_id` |
 | `1710000000003-Sprint3NotesRa` | 3 | `daily_summaries.summary_type` (`RC` \| `RA`) |
+| `1710000000004-CreateProducts` | — | Tabla `products` |
+| `1710000000005-CertificatePfxContent` | — | `certificates.pfx_content` (bytea) |
+| `1710000000006-CompanyContact` | — | `companies.email`, `companies.phone` |
 
 ---
 
@@ -101,6 +104,8 @@ Tenant emisor. Resuelto por `X-Api-Key` en cada request.
 | `business_name` | varchar(255) | Razón social |
 | `trade_name` | varchar(255) | |
 | `address` | varchar(500) | |
+| `email` | varchar(255) | Correo de contacto |
+| `phone` | varchar(50) | Teléfono de contacto |
 | `ubigeo` | varchar(6) | |
 | `sunat_environment` | varchar(20) | `beta` \| `homologacion` \| `production` |
 | `sol_username` | varchar(100) | Credencial SOL; beta: `{ruc}MODDATOS` |
