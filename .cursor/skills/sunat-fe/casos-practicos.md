@@ -113,7 +113,7 @@ Ver también [proceso-facturacion.md](proceso-facturacion.md), [frontend-guia.md
 | | RC altas | RC void | RA (facturas) |
 |---|----------|---------|---------------|
 | Endpoint | `POST /v1/daily-summaries` | `POST /v1/daily-summaries/void` | `POST /v1/voided-documents` |
-| Tipos doc | `03`, `07`, `08` | solo `03` | solo `01` |
+| Tipos doc | `03`, `07`, `08` | `03`, `07`, `08` | solo `01` |
 | Selección | Auto: `signed` + sin RC + `issueDate` | Manual: `documentIds[]` | Manual: facturas `accepted` |
 | Estado doc entrada | `signed` | `accepted` + ya tuvo RC | `accepted` |
 | ConditionCode | `1` | `3` | N/A |
@@ -124,7 +124,7 @@ Ver también [proceso-facturacion.md](proceso-facturacion.md), [frontend-guia.md
 | Doc | `signed` (sin RC) | `accepted` (en RC) |
 |-----|-------------------|---------------------|
 | Boleta `03` | Omitir del RC | Void boleta ✅ |
-| NC `07` / ND `08` | Omitir del RC | Void nota ❌ (no implementado) |
+| NC `07` / ND `08` | Omitir del RC | Void nota ✅ |
 | NC / ND factura | `sendBill` | Otro flujo (RA factura si aplica) |
 
 Detalle: [API-REFERENCE.md](../../../docs/API-REFERENCE.md) → *Matriz anulación — RC void por tipo de documento*.
@@ -253,7 +253,7 @@ Usuario quiere revertir una boleta accepted
 | RA para boleta `03` | RA es solo facturas |
 | RC void para factura `01` | Usar RA (`voided-documents`) |
 | Crear RC/RA nuevo con ticket pendiente | Usar `POST .../status` |
-| `documentIds` en void con NC o factura | Void solo acepta boletas `03` `accepted` |
+| `documentIds` en void con factura `01` | Void acepta `03`/`07`/`08` vía RC; facturas usan RA |
 
 ---
 

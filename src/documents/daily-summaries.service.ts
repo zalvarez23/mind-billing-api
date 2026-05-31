@@ -46,8 +46,8 @@ import {
 import { hasRcVoidInProgress } from './types/document-payload.types';
 import { getBusinessIsoDate } from '../common/date-time.util';
 
-const BOLETA_DOC_TYPE = '03';
 const RC_DOC_TYPES = ['03', '07', '08'] as const;
+const VOID_RC_DOC_TYPES = RC_DOC_TYPES;
 const STATUS_POLL_ATTEMPTS = 5;
 const STATUS_POLL_DELAY_MS = 2000;
 const VOID_CONDITION_CODE = '3';
@@ -151,10 +151,10 @@ export class DailySummariesService {
     const page = dto.page ?? 1;
     const limit = dto.limit ?? 20;
 
-    const boletas = await this.loadVoidBoletas(company.id, dto);
+    const documents = await this.loadVoidDocuments(company.id, dto);
     const referenceDate = this.resolveVoidReferenceDate(
       dto.referenceDate,
-      boletas[0]?.issueDate,
+      documents[0]?.issueDate,
     );
 
     const warnings = await this.collectPendingRcWarnings(company.id, issueDate);
@@ -165,7 +165,7 @@ export class DailySummariesService {
       issueDate,
       this.dailySummaryRepository,
     );
-    const lines = boletas.map((doc, index) =>
+    const lines = documents.map((doc, index) =>
       buildSummaryLine(doc, index + 1, VOID_CONDITION_CODE),
     );
     const signedXml = await this.rcXmlHelper.buildSignedRcXml(
@@ -187,7 +187,7 @@ export class DailySummariesService {
       issueDate,
       conditionCode: VOID_CONDITION_CODE,
       correlativo,
-      documents: boletas,
+      documents,
       lines,
       signedXml,
       warnings,
@@ -305,11 +305,11 @@ export class DailySummariesService {
     const issueDate = dto.issueDate ?? this.todayIsoDate();
     const issueDateYmd = issueDate.replace(/-/g, '');
 
-    const boletas = await this.loadVoidBoletas(company.id, dto);
+    const documents = await this.loadVoidDocuments(company.id, dto);
 
     const referenceDate = this.resolveVoidReferenceDate(
       dto.referenceDate,
-      boletas[0]?.issueDate,
+      documents[0]?.issueDate,
     );
 
     const prepared = await this.dataSource.transaction(async (manager) => {
@@ -324,7 +324,7 @@ export class DailySummariesService {
         summaryRepo,
       );
 
-      const lines = boletas.map((doc, index) =>
+      const lines = documents.map((doc, index) =>
         buildSummaryLine(doc, index + 1, VOID_CONDITION_CODE),
       );
 
@@ -356,14 +356,14 @@ export class DailySummariesService {
         }),
       );
 
-      for (const boleta of boletas) {
-        markBoletaVoidPending(boleta, summary.id);
-        await documentRepo.save(boleta);
+      for (const document of documents) {
+        markBoletaVoidPending(document, summary.id);
+        await documentRepo.save(document);
       }
 
       return {
         summary,
-        documents: boletas,
+        documents,
         xml: signedXml.xml,
         fileBaseName: signedXml.fileBaseName,
         xmlFileName: signedXml.xmlFileName,
@@ -734,55 +734,59 @@ export class DailySummariesService {
     });
   }
 
-  private async loadVoidBoletas(
+  private async loadVoidDocuments(
     companyId: string,
     dto: VoidDailySummaryDto,
   ): Promise<Document[]> {
-    const boletas = await this.documentRepository.find({
+    const documents = await this.documentRepository.find({
       where: {
         id: In(dto.documentIds),
         companyId,
-        docType: BOLETA_DOC_TYPE,
+        docType: In([...VOID_RC_DOC_TYPES]),
         status: DocumentStatus.ACCEPTED,
       },
-      order: { serie: 'ASC', correlativo: 'ASC' },
+      order: { docType: 'ASC', serie: 'ASC', correlativo: 'ASC' },
     });
 
-    if (boletas.length !== dto.documentIds.length) {
+    if (documents.length !== dto.documentIds.length) {
       throw new BadRequestException(
-        'All documentIds must be accepted boletas (03) of this company',
+        'All documentIds must be accepted boletas or notes (03, 07, 08) of this company',
       );
     }
 
     const referenceDate = this.resolveVoidReferenceDate(
       dto.referenceDate,
-      boletas[0]?.issueDate,
+      documents[0]?.issueDate,
     );
 
-    for (const boleta of boletas) {
-      if (!boleta.issueDate) {
+    for (const document of documents) {
+      const label = this.formatVoidDocumentLabel(document);
+
+      if (!document.issueDate) {
+        throw new BadRequestException(`${label} has no issueDate`);
+      }
+      if (document.issueDate !== referenceDate) {
         throw new BadRequestException(
-          `Boleta ${boleta.serie}-${boleta.correlativo} has no issueDate`,
+          `All documents must share referenceDate ${referenceDate}. ${label} was issued on ${document.issueDate}.`,
         );
       }
-      if (boleta.issueDate !== referenceDate) {
+      if (!document.dailySummaryId) {
         throw new BadRequestException(
-          `All boletas must share referenceDate ${referenceDate}. Boleta ${boleta.serie}-${boleta.correlativo} was issued on ${boleta.issueDate}.`,
+          `${label} was never accepted via RC (only documents from daily summary can be voided here)`,
         );
       }
-      if (!boleta.dailySummaryId) {
+      if (hasRcVoidInProgress(document.payload)) {
         throw new BadRequestException(
-          `Boleta ${boleta.serie}-${boleta.correlativo} was never accepted via RC`,
-        );
-      }
-      if (hasRcVoidInProgress(boleta.payload)) {
-        throw new BadRequestException(
-          `Boleta ${boleta.serie}-${boleta.correlativo} already has a void RC in progress`,
+          `${label} already has a void RC in progress`,
         );
       }
     }
 
-    return boletas;
+    return documents;
+  }
+
+  private formatVoidDocumentLabel(document: Document): string {
+    return `Document ${document.docType} ${document.serie}-${document.correlativo}`;
   }
 
   private async collectPendingRcWarnings(
@@ -1022,7 +1026,9 @@ export class DailySummariesService {
 
     if (
       documents.length > 0 &&
-      documents.every((doc) => doc.docType === BOLETA_DOC_TYPE) &&
+      documents.every((doc) =>
+        (VOID_RC_DOC_TYPES as readonly string[]).includes(doc.docType),
+      ) &&
       documents.every((doc) => doc.status === DocumentStatus.ACCEPTED)
     ) {
       return 'accept-as-voided';
@@ -1055,7 +1061,7 @@ export class DailySummariesService {
     const referenceDate = dtoReferenceDate ?? firstBoletaIssueDate ?? '';
     if (!referenceDate) {
       throw new BadRequestException(
-        'referenceDate is required when boletas have no issueDate',
+        'referenceDate is required when documents have no issueDate',
       );
     }
     return referenceDate;

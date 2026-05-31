@@ -80,10 +80,10 @@ Informa boletas y notas que no van por `sendBill`.
 | Doc | `signed` | `accepted` |
 |-----|----------|------------|
 | Boleta `03` | Omitir del RC | Void boleta ✅ (`POST /daily-summaries/void`) |
-| NC `07` / ND `08` (boleta) | Omitir del RC | Void nota ❌ (API no implementado; backlog v2) |
+| NC `07` / ND `08` (boleta) | Omitir del RC | Void nota ✅ (`POST /daily-summaries/void`) |
 | NC / ND factura | `sendBill` | Otro flujo; RA para factura si aplica |
 
-**En una línea:** void RC hoy = solo boletas `03`. NC/ND `07`/`08` ya `accepted` en RC no se anulan con el API actual.
+**En una línea:** void RC = boletas `03` y notas `07`/`08` ya `accepted` en RC (`dailySummaryId`). NC/ND sobre factura no entran (van por `sendBill`).
 
 ### Árbol de decisión — boleta
 
@@ -105,7 +105,7 @@ Informa boletas y notas que no van por `sendBill`.
 | Tipo RC | referenceDate | issueDate |
 |---------|---------------|-----------|
 | Altas | Fecha emisión docs en el RC | Fecha envío RC (típ. hoy) |
-| Void | Fecha emisión **original boleta** | Fecha envío RC void (típ. hoy) |
+| Void | Fecha emisión **original** del comprobante (boleta o nota) | Fecha envío RC void (típ. hoy) |
 | NC boleta de ayer | **Hoy** (fecha emisión NC) | Hoy |
 
 ---

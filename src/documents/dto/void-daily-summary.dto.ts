@@ -12,7 +12,7 @@ export class VoidDailySummaryDto {
   @IsUUID('4', { each: true })
   documentIds: string[];
 
-  /** Fecha de emisión original de las boletas (YYYY-MM-DD). */
+  /** Fecha de emisión original de los comprobantes (YYYY-MM-DD). */
   @IsOptional()
   @IsDateString()
   referenceDate?: string;

@@ -244,8 +244,8 @@ Catálogo 06: `1` DNI, `6` RUC, etc.
 | POST   | `/debit-notes`                | Nota de débito `08`                        |
 | POST   | `/daily-summaries/preview`    | Vista previa RC altas (sin SUNAT)          |
 | POST   | `/daily-summaries`            | RC altas (boletas/notas `signed`)          |
-| POST   | `/daily-summaries/void/preview` | Vista previa RC anulación boletas        |
-| POST   | `/daily-summaries/void`       | RC anulación boletas                       |
+| POST   | `/daily-summaries/void/preview` | Vista previa RC anulación (`03`, `07`, `08`) |
+| POST   | `/daily-summaries/void`       | RC anulación boletas y notas (`03`, `07`, `08`) |
 | POST   | `/voided-documents`           | RA baja facturas                           |
 | GET    | `/daily-summaries`            | Listado RC/RA paginado                     |
 | GET    | `/daily-summaries/:id`        | Detalle RC/RA                              |
@@ -857,51 +857,52 @@ Estados intermedios: `processing`, `submitted` → usar `/status` para poll.
 
 #### Matriz anulación — RC void por tipo de documento (v1)
 
-Qué hacer según **estado** del comprobante y si ya fue informado a SUNAT. `POST /daily-summaries/void` hoy **solo acepta boletas `03`** en `documentIds`.
+Qué hacer según **estado** del comprobante y si ya fue informado a SUNAT. `POST /daily-summaries/void` acepta boletas `03` y notas `07`/`08` **accepted** vía RC en `documentIds`.
 
 | Doc | `signed` (sin RC / no aceptado en SUNAT) | `accepted` (ya en RC aceptado) |
 | --- | ---------------------------------------- | ------------------------------ |
 | Boleta `03` | Omitir del RC (no void); emitir doc. correcto si hace falta | **Void boleta** ✅ `POST /daily-summaries/void` (`ConditionCode 3`) |
-| NC `07` (sobre boleta) | Omitir del RC | **Void nota** ❌ no implementado en API |
-| ND `08` (sobre boleta) | Omitir del RC | **Void nota** ❌ no implementado en API |
+| NC `07` (sobre boleta) | Omitir del RC | **Void nota** ✅ `POST /daily-summaries/void` (`ConditionCode 3`) |
+| ND `08` (sobre boleta) | Omitir del RC | **Void nota** ✅ `POST /daily-summaries/void` (`ConditionCode 3`) |
 | NC / ND sobre factura `01` | N/A (`sendBill`, no RC) | Anulación por **otro flujo** (no `POST /daily-summaries/void`); factura vía **RA** si aplica |
 
 **Notas:**
 
-- **Void boleta** = anular la **venta** no entregada (`documentIds[]` solo UUID boletas `03` `accepted` con `dailySummaryId`).
-- **NC entregada** = crédito post-venta; **no** usar void sobre la boleta original por el mismo caso.
-- **NC/ND `accepted` en RC** que se emitió por error: en SUNAT sería RC void con `ConditionCode 3` sobre la nota; el API **aún no** lo expone (backlog v2).
-- **NC/ND factura** van por `sendBill`; no entran en RC void de boletas.
+- **Void boleta** = anular la **venta** no entregada (`documentIds[]` UUID boletas `03` `accepted` con `dailySummaryId`).
+- **Void nota** = anular NC/ND emitida por error (`documentIds[]` UUID notas `07`/`08` `accepted` con `dailySummaryId`; la boleta afectada **sigue** `accepted`).
+- **NC entregada válida** = crédito post-venta; **no** usar void sobre la boleta original por el mismo caso.
+- **NC/ND factura** van por `sendBill` (sin `dailySummaryId`); no entran en RC void.
+- Todos los `documentIds` del mismo request deben compartir `referenceDate` (= `issueDate` de cada comprobante).
 
 ---
 
 ### `POST /v1/daily-summaries/void/preview` — Vista previa RC anulación
 
-Mismo body que void (`documentIds`, `referenceDate`, `issueDate`) más `page`, `limit`, `includeXml`. Sin efectos en BD ni SUNAT.
+Mismo body que void (`documentIds`, `referenceDate`, `issueDate`) más `page`, `limit`, `includeXml`. Sin efectos en BD ni SUNAT. Acepta boletas `03` y notas `07`/`08` **accepted** vía RC.
 
 ---
 
-### `POST /v1/daily-summaries/void` — RC anulación boletas
+### `POST /v1/daily-summaries/void` — RC anulación boletas y notas
 
-Boletas `03` **accepted**, no entregadas al cliente. Ver matriz **RC void por tipo de documento** arriba — **no** incluye NC `07` ni ND `08`.
+Boletas `03` o notas `07`/`08` en **`accepted`**, informadas previamente en RC. Ver matriz **RC void por tipo de documento** arriba.
 
 **Body:**
 
 ```json
 {
-  "documentIds": ["uuid-boleta-1"],
+  "documentIds": ["uuid-boleta-o-nota-1"],
   "referenceDate": "2026-05-26",
   "issueDate": "2026-05-26"
 }
 ```
 
-| Campo           | Notas                                   |
-| --------------- | --------------------------------------- |
-| `documentIds`   | UUID[] obligatorio                      |
-| `referenceDate` | Fecha emisión **original** de la boleta |
-| `issueDate`     | Fecha envío del RC void (default hoy)   |
+| Campo           | Notas                                              |
+| --------------- | -------------------------------------------------- |
+| `documentIds`   | UUID[] obligatorio (`03`, `07` o `08` `accepted`)  |
+| `referenceDate` | Fecha emisión **original** del comprobante a anular |
+| `issueDate`     | Fecha envío del RC void (default hoy)              |
 
-Tras CDR aceptado: boletas → `voided`.
+Tras CDR aceptado: comprobantes → `voided`.
 
 ---
 
