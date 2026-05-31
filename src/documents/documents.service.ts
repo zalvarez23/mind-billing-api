@@ -651,9 +651,9 @@ export class DocumentsService {
       );
     }
 
-    qb.orderBy('doc.issueDate', 'DESC')
+    qb.orderBy('doc.createdAt', 'DESC')
       .addOrderBy('doc.serie', 'ASC')
-      .addOrderBy('doc.correlativo', 'DESC');
+      .addOrderBy('doc.correlativo', 'ASC');
 
     const [documents, total] = await qb
       .skip((page - 1) * limit)

@@ -119,6 +119,16 @@ Ver también [proceso-facturacion.md](proceso-facturacion.md), [frontend-guia.md
 | ConditionCode | `1` | `3` | N/A |
 | Estado doc salida | `accepted` | `voided` | `voided` |
 
+**Por estado del documento (v1):**
+
+| Doc | `signed` (sin RC) | `accepted` (en RC) |
+|-----|-------------------|---------------------|
+| Boleta `03` | Omitir del RC | Void boleta ✅ |
+| NC `07` / ND `08` | Omitir del RC | Void nota ❌ (no implementado) |
+| NC / ND factura | `sendBill` | Otro flujo (RA factura si aplica) |
+
+Detalle: [API-REFERENCE.md](../../../docs/API-REFERENCE.md) → *Matriz anulación — RC void por tipo de documento*.
+
 ---
 
 ## Caso 7: Boleta mala + boleta buena, **mismo día**, RC pendiente

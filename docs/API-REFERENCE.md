@@ -855,6 +855,26 @@ Estados intermedios: `processing`, `submitted` → usar `/status` para poll.
 
 ---
 
+#### Matriz anulación — RC void por tipo de documento (v1)
+
+Qué hacer según **estado** del comprobante y si ya fue informado a SUNAT. `POST /daily-summaries/void` hoy **solo acepta boletas `03`** en `documentIds`.
+
+| Doc | `signed` (sin RC / no aceptado en SUNAT) | `accepted` (ya en RC aceptado) |
+| --- | ---------------------------------------- | ------------------------------ |
+| Boleta `03` | Omitir del RC (no void); emitir doc. correcto si hace falta | **Void boleta** ✅ `POST /daily-summaries/void` (`ConditionCode 3`) |
+| NC `07` (sobre boleta) | Omitir del RC | **Void nota** ❌ no implementado en API |
+| ND `08` (sobre boleta) | Omitir del RC | **Void nota** ❌ no implementado en API |
+| NC / ND sobre factura `01` | N/A (`sendBill`, no RC) | Anulación por **otro flujo** (no `POST /daily-summaries/void`); factura vía **RA** si aplica |
+
+**Notas:**
+
+- **Void boleta** = anular la **venta** no entregada (`documentIds[]` solo UUID boletas `03` `accepted` con `dailySummaryId`).
+- **NC entregada** = crédito post-venta; **no** usar void sobre la boleta original por el mismo caso.
+- **NC/ND `accepted` en RC** que se emitió por error: en SUNAT sería RC void con `ConditionCode 3` sobre la nota; el API **aún no** lo expone (backlog v2).
+- **NC/ND factura** van por `sendBill`; no entran en RC void de boletas.
+
+---
+
 ### `POST /v1/daily-summaries/void/preview` — Vista previa RC anulación
 
 Mismo body que void (`documentIds`, `referenceDate`, `issueDate`) más `page`, `limit`, `includeXml`. Sin efectos en BD ni SUNAT.
@@ -863,7 +883,7 @@ Mismo body que void (`documentIds`, `referenceDate`, `issueDate`) más `page`, `
 
 ### `POST /v1/daily-summaries/void` — RC anulación boletas
 
-Boletas `03` **accepted**, no entregadas al cliente.
+Boletas `03` **accepted**, no entregadas al cliente. Ver matriz **RC void por tipo de documento** arriba — **no** incluye NC `07` ni ND `08`.
 
 **Body:**
 
@@ -1342,6 +1362,8 @@ Cabeceras sin `payload` completo. Para ítems → detalle por id.
 | `q`         | string                 | —       | ILIKE en `serie`, `correlativo`, `serie-correlativo`, `cliente.numDoc`, `cliente.razonSocial`, `id` |
 | `page`      | int                    | `1`     | Página                               |
 | `limit`     | int                    | `20`    | Máx `100`                            |
+
+**Orden (fijo):** `createdAt` DESC (más recientes primero) → `serie` ASC → `correlativo` ASC. Los filtros `issueDate` / `from` / `to` no cambian el criterio de orden.
 
 **Response `200`:**
 

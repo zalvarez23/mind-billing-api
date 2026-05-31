@@ -75,6 +75,16 @@ Informa boletas y notas que no van por `sendBill`.
 | Factura anular | `POST /voided-documents` (RA), **no** RC void |
 | NC sobre factura | `POST /credit-notes` → `sendBill`; factura **sigue `accepted`** |
 
+### Matriz RC void por tipo (v1)
+
+| Doc | `signed` | `accepted` |
+|-----|----------|------------|
+| Boleta `03` | Omitir del RC | Void boleta ✅ (`POST /daily-summaries/void`) |
+| NC `07` / ND `08` (boleta) | Omitir del RC | Void nota ❌ (API no implementado; backlog v2) |
+| NC / ND factura | `sendBill` | Otro flujo; RA para factura si aplica |
+
+**En una línea:** void RC hoy = solo boletas `03`. NC/ND `07`/`08` ya `accepted` en RC no se anulan con el API actual.
+
 ### Árbol de decisión — boleta
 
 ```
