@@ -462,6 +462,31 @@ export function documentLabel(d: Pick<DocumentDetail, 'serie' | 'correlativo'>):
 
 ## Daily summary — responses
 
+### `GET /v1/daily-summaries`
+
+```typescript
+export interface ListDailySummariesQuery {
+  referenceDate?: IsoDate;
+  issueDate?: IsoDate;
+  from?: IsoDate;
+  to?: IsoDate;
+  summaryType?: DailySummaryType;
+  status?: DailySummaryStatus;
+  page?: number;
+  limit?: number;
+}
+
+export interface DailySummaryListResponse {
+  data: DailySummaryDetail[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+```
+
 ### `GET /v1/daily-summaries/:id`
 
 ```typescript
@@ -567,6 +592,7 @@ En axios/fetch, parsear `error.response.data` como `SunatSubmitError` cuando `st
 | POST | `/daily-summaries` | `CloseDailySummaryRequest` | `DailySummarySubmitResponse` |
 | POST | `/daily-summaries/void` | `VoidDailySummaryRequest` | `DailySummarySubmitResponse` |
 | POST | `/voided-documents` | `VoidedDocumentsRequest` | `DailySummarySubmitResponse` |
+| GET | `/daily-summaries` | query `ListDailySummariesQuery` | `DailySummaryListResponse` |
 | GET | `/daily-summaries/:id` | — | `DailySummaryDetail` |
 | POST | `/daily-summaries/:id/status` | — | `DailySummarySubmitResponse` |
 | GET | `/documents` | query `ListDocumentsQuery` | `DocumentListResponse` |

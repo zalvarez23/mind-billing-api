@@ -17,12 +17,15 @@ import { CloseDailySummaryDto } from './dto/close-daily-summary.dto';
 import { PreviewCloseDailySummaryDto } from './dto/preview-close-daily-summary.dto';
 import { PreviewVoidDailySummaryDto } from './dto/preview-void-daily-summary.dto';
 import { VoidDailySummaryDto } from './dto/void-daily-summary.dto';
+import { ListDailySummariesQueryDto } from './dto/list-daily-summaries-query.dto';
+import { toDailySummaryResponse } from './daily-summary.mapper';
 import {
   aggregatePreviewTotals,
   paginateArray,
   toPreviewDocumentItem,
 } from './daily-summaries-preview.util';
 import type { DailySummaryPreviewResponse } from './types/daily-summary-preview.types';
+import { DailySummaryListResponse } from './types/daily-summary-response.types';
 import {
   buildSummaryLine,
   finalizeBoletaVoid,
@@ -437,6 +440,73 @@ export class DailySummariesService {
     }
 
     return summary;
+  }
+
+  async findAll(
+    companyId: string,
+    query: ListDailySummariesQueryDto,
+  ): Promise<DailySummaryListResponse> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+
+    const qb = this.dailySummaryRepository
+      .createQueryBuilder('summary')
+      .loadRelationCountAndMap('summary.documentCount', 'summary.documents')
+      .where('summary.companyId = :companyId', { companyId });
+
+    if (query.referenceDate) {
+      qb.andWhere('summary.referenceDate = :referenceDate', {
+        referenceDate: query.referenceDate,
+      });
+    }
+
+    if (query.issueDate) {
+      qb.andWhere('summary.issueDate = :issueDate', {
+        issueDate: query.issueDate,
+      });
+    } else {
+      if (query.from) {
+        qb.andWhere('summary.issueDate >= :from', { from: query.from });
+      }
+      if (query.to) {
+        qb.andWhere('summary.issueDate <= :to', { to: query.to });
+      }
+    }
+
+    if (query.summaryType) {
+      qb.andWhere('summary.summaryType = :summaryType', {
+        summaryType: query.summaryType,
+      });
+    }
+
+    if (query.status) {
+      qb.andWhere('summary.status = :status', { status: query.status });
+    }
+
+    qb.orderBy('summary.issueDate', 'DESC').addOrderBy(
+      'summary.correlativo',
+      'DESC',
+    );
+
+    const [summaries, total] = await qb
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
+
+    return {
+      data: summaries.map((summary) =>
+        toDailySummaryResponse(
+          summary,
+          (summary as DailySummary & { documentCount?: number }).documentCount,
+        ),
+      ),
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: total === 0 ? 0 : Math.ceil(total / limit),
+      },
+    };
   }
 
   private async submitRcToSunat(

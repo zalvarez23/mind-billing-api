@@ -247,6 +247,7 @@ Catálogo 06: `1` DNI, `6` RUC, etc.
 | POST   | `/daily-summaries/void/preview` | Vista previa RC anulación boletas        |
 | POST   | `/daily-summaries/void`       | RC anulación boletas                       |
 | POST   | `/voided-documents`           | RA baja facturas                           |
+| GET    | `/daily-summaries`            | Listado RC/RA paginado                     |
 | GET    | `/daily-summaries/:id`        | Detalle RC/RA                              |
 | POST   | `/daily-summaries/:id/status` | Polling ticket SUNAT                       |
 | GET    | `/documents`                  | Listado paginado                           |
@@ -746,6 +747,64 @@ Solo facturas `01` en `accepted`.
 `referenceDate` debe coincidir con `issueDate` de la factura.
 
 **Response:** misma forma que RC (`dailySummaryId` en body de error o `id` en éxito). Polling: `POST /v1/daily-summaries/{id}/status`.
+
+---
+
+### `GET /v1/daily-summaries` — Listado RC/RA
+
+JWT + empresa del token. Listado paginado de resúmenes enviados (RC y RA).
+
+**Query params (todos opcionales):**
+
+| Param           | Tipo                   | Default | Descripción                                      |
+| --------------- | ---------------------- | ------- | ------------------------------------------------ |
+| `referenceDate` | `YYYY-MM-DD`           | —       | Fecha de emisión de los comprobantes del resumen |
+| `issueDate`     | `YYYY-MM-DD`           | —       | Día exacto de envío a SUNAT (prioridad sobre rango) |
+| `from`          | `YYYY-MM-DD`           | —       | Inicio rango de `issue_date`                     |
+| `to`            | `YYYY-MM-DD`           | —       | Fin rango de `issue_date`                        |
+| `summaryType`   | `RC` \| `RA`           | —       | Tipo de resumen                                  |
+| `status`        | string                 | —       | `draft`, `processing`, `accepted`, `rejected`, etc. |
+| `page`          | int                    | `1`     | Página                                           |
+| `limit`         | int                    | `20`    | Máx `100`                                        |
+
+**Response `200`:**
+
+```json
+{
+  "data": [
+    {
+      "id": "...",
+      "summaryType": "RC",
+      "summaryCode": "RC-20260526-1",
+      "referenceDate": "2026-05-26",
+      "issueDate": "2026-05-26",
+      "correlativo": 1,
+      "status": "accepted",
+      "ticket": "2026123456789",
+      "statusCode": "0",
+      "errorMessage": null,
+      "documentCount": 3,
+      "createdAt": "...",
+      "updatedAt": "..."
+    }
+  ],
+  "meta": { "page": 1, "limit": 20, "total": 5, "totalPages": 1 }
+}
+```
+
+**Ejemplos:**
+
+```http
+GET /v1/daily-summaries?issueDate=2026-05-26
+GET /v1/daily-summaries?referenceDate=2026-05-26&summaryType=RC
+GET /v1/daily-summaries?from=2026-05-01&to=2026-05-31&status=processing
+GET /v1/daily-summaries?summaryType=RA&page=1&limit=10
+```
+
+```bash
+curl -s "$BASE/daily-summaries?referenceDate=2026-05-30&summaryType=RC" \
+  -H "Authorization: Bearer $TOKEN" | jq
+```
 
 ---
 
@@ -1443,7 +1502,6 @@ Tipos completos: [frontend-tipos-api.md](../.cursor/skills/sunat-fe/frontend-tip
 
 | Feature                               | Estado                                 |
 | ------------------------------------- | -------------------------------------- |
-| `GET /daily-summaries` (listado)      | Backlog                                |
 | `customerId` / `productId` en emisión | Backlog                                |
 | RC altas por whitelist `documentIds`  | Backlog (hoy: auto todas las `signed`) |
 | Swagger / OpenAPI                     | Sprint 4                               |

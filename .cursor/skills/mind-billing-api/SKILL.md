@@ -58,6 +58,7 @@ Dev: login `ruc: 20000000001`, `username: admin`, `password: admin123`.
 | POST   | `/v1/daily-summaries/void/preview` |
 | POST   | `/v1/daily-summaries/void`       |
 | POST   | `/v1/voided-documents`           |
+| GET    | `/v1/daily-summaries`            |
 | GET    | `/v1/daily-summaries/:id`        |
 | POST   | `/v1/daily-summaries/:id/status` |
 | GET    | `/v1/documents`                  |

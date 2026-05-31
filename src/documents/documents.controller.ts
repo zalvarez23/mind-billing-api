@@ -23,6 +23,8 @@ import { CreateVoidedDocumentsDto } from './dto/create-voided-documents.dto';
 import { CancelDocumentsDto } from './dto/cancel-documents.dto';
 import { ListDocumentsQueryDto } from './dto/list-documents-query.dto';
 import { DailySummariesService } from './daily-summaries.service';
+import { toDailySummaryResponse } from './daily-summary.mapper';
+import { ListDailySummariesQueryDto } from './dto/list-daily-summaries-query.dto';
 import { DocumentsService } from './documents.service';
 import { toDocumentDetailResponse } from './document-detail.mapper';
 import {
@@ -153,24 +155,18 @@ export class DailySummariesController {
     return this.dailySummariesService.voidDailySummary(company, user, dto);
   }
 
+  @Get()
+  findAll(
+    @CurrentCompany() company: Company,
+    @Query() query: ListDailySummariesQueryDto,
+  ) {
+    return this.dailySummariesService.findAll(company.id, query);
+  }
+
   @Get(':id')
   async findOne(@CurrentCompany() company: Company, @Param('id') id: string) {
     const summary = await this.dailySummariesService.findById(company.id, id);
-    return {
-      id: summary.id,
-      summaryType: summary.summaryType,
-      summaryCode: summary.summaryCode,
-      referenceDate: summary.referenceDate,
-      issueDate: summary.issueDate,
-      correlativo: summary.correlativo,
-      status: summary.status,
-      ticket: summary.ticket,
-      statusCode: summary.statusCode,
-      errorMessage: summary.errorMessage,
-      documentCount: summary.documents?.length ?? 0,
-      createdAt: summary.createdAt,
-      updatedAt: summary.updatedAt,
-    };
+    return toDailySummaryResponse(summary);
   }
 
   @Post(':id/status')
