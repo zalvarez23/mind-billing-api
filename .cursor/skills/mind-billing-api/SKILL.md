@@ -46,6 +46,7 @@ Dev: login `ruc: 20000000001`, `username: admin`, `password: admin123`.
 | ------ | -------------------------------- |
 | POST   | `/v1/auth/login`                 |
 | POST   | `/v1/admin/companies`            |
+| GET    | `/v1/companies/:id`              |
 | GET    | `/v1/auth/me`                    |
 | POST   | `/v1/invoices`                   |
 | POST   | `/v1/boletas`                    |

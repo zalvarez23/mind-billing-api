@@ -1,4 +1,8 @@
-import { ConflictException, Injectable } from '@nestjs/common';
+import {
+  ConflictException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { DataSource, Repository } from 'typeorm';
@@ -10,7 +14,10 @@ import { User } from '../users/entities/user.entity';
 import { toCompanyResponse } from './company.mapper';
 import { CreateCompanyDto } from './dto/create-company.dto';
 import { Company } from './entities/company.entity';
-import { CompanyCreatedResponse } from './types/company-response.types';
+import {
+  CompanyCreatedResponse,
+  CompanyResponse,
+} from './types/company-response.types';
 
 @Injectable()
 export class CompaniesService {
@@ -19,6 +26,25 @@ export class CompaniesService {
     @InjectRepository(Company)
     private readonly companyRepository: Repository<Company>,
   ) {}
+
+  async findById(
+    requesterCompanyId: string,
+    id: string,
+  ): Promise<CompanyResponse> {
+    if (id !== requesterCompanyId) {
+      throw new NotFoundException('Company not found');
+    }
+
+    const company = await this.companyRepository.findOne({
+      where: { id, isActive: true },
+    });
+
+    if (!company) {
+      throw new NotFoundException('Company not found');
+    }
+
+    return toCompanyResponse(company);
+  }
 
   async create(dto: CreateCompanyDto): Promise<CompanyCreatedResponse> {
     const existing = await this.companyRepository.findOne({

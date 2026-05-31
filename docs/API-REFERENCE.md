@@ -96,6 +96,55 @@ Guardar **`apiKey`** del response: es la clave tenant (distinta de `ADMIN_API_KE
 
 ---
 
+## Empresa (tenant)
+
+Rutas protegidas con **JWT**. Solo puedes consultar **tu propia** empresa (`id` del JWT debe coincidir con `:id`).
+
+### `GET /v1/companies/:id` — Detalle empresa
+
+**Headers:** `Authorization: Bearer <JWT>`.
+
+**Params:** `id` — UUID de la empresa (mismo que en login / `GET /auth/me`).
+
+**Response `200`:**
+
+```json
+{
+  "id": "00000000-0000-4000-8000-000000000001",
+  "ruc": "20000000001",
+  "businessName": "EMPRESA DEV SAC",
+  "tradeName": "Empresa Dev",
+  "address": "Av. Dev 123, Lima",
+  "ubigeo": "150101",
+  "sunatEnvironment": "beta",
+  "solUsername": "20000000001MODDATOS",
+  "hasSolPassword": true,
+  "isActive": true,
+  "createdAt": "2026-05-24T12:00:00.000Z",
+  "updatedAt": "2026-05-24T12:00:00.000Z"
+}
+```
+
+| Campo | Notas |
+|-------|-------|
+| `hasSolPassword` | Indica si hay clave SOL guardada; **no** devuelve la contraseña |
+| `solUsername` | Usuario SOL para SUNAT |
+
+**Errores:** `401` JWT inválido; `404` si `id` no es tu empresa o no existe.
+
+```typescript
+const companyId = loginResponse.company.id;
+
+const res = await fetch(`/v1/companies/${companyId}`, {
+  headers: { Authorization: `Bearer ${token}` },
+});
+const company = await res.json();
+```
+
+**Diferencia con `GET /auth/me`:** `/auth/me` devuelve usuario + resumen de empresa; `/companies/:id` devuelve **todos** los campos de la empresa (`address`, `ubigeo`, `solUsername`, `hasSolPassword`, fechas).
+
+---
+
 ## Tipos compartidos (body de emisión)
 
 ### Cliente
@@ -141,6 +190,7 @@ Catálogo 06: `1` DNI, `6` RUC, etc.
 | ------ | ----------------------------- | ------------------------------------------ |
 | POST   | `/auth/login`                 | Obtener JWT                                |
 | POST   | `/admin/companies`            | Alta empresa (header `X-Admin-Api-Key`)  |
+| GET    | `/companies/:id`              | Detalle empresa (JWT, solo la propia)    |
 | GET    | `/auth/me`                    | Usuario y empresa actual                   |
 | POST   | `/invoices`                   | Emitir factura + envío SUNAT               |
 | POST   | `/boletas`                    | Emitir boleta (firmada, pendiente RC)      |
