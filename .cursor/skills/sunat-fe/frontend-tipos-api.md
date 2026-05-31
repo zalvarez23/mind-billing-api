@@ -61,7 +61,8 @@ export type DailySummaryStatus =
   | 'processing'
   | 'accepted'
   | 'rejected'
-  | 'failed';
+  | 'failed'
+  | 'cancelled';
 ```
 
 ---

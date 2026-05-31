@@ -320,13 +320,21 @@ Resúmenes SUNAT: **RC** (comunicación de comprobantes) y **RA** (bajas de fact
 | `accepted` | CDR OK |
 | `rejected` | SUNAT rechazó |
 | `failed` | Error técnico (HTTP, timeout) |
+| `cancelled` | RC altas: envío falló sin ticket; documentos no vinculados |
 
-#### Relación con `documents`
+#### Relación con `documents` (RC altas)
 
-- **RC altas:** docs `signed` → tras aceptar RC → `accepted`, `daily_summary_id` permanece.
+- **Tras TX local:** docs `signed`, `daily_summary_id` sigue `null` hasta que SUNAT devuelve ticket.
+- **Tras ticket:** docs `signed` con `daily_summary_id` del RC.
+- **Tras CDR aceptado:** docs → `accepted`.
+- **Fallo sin ticket:** RC → `cancelled`; docs nunca ligados → reenviar RC.
+- **Fallo con ticket / processing:** docs ligados → `POST /daily-summaries/:id/status`.
+- **SUNAT rechazó CDR:** docs liberados (`daily_summary_id = null`), `signed`.
+
+**Otros flujos (sin cambio):**
+
 - **RC void:** boletas `accepted` → tras aceptar → `voided`.
 - **RA:** facturas `accepted` → tras aceptar → `voided`.
-- **Fallo sin ticket:** API puede poner `daily_summary_id = NULL` en docs afectados.
 
 ---
 

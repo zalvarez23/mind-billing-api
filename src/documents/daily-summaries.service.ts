@@ -52,6 +52,16 @@ const ALTA_CONDITION_CODE = '1';
 
 type SummarySubmitOutcome = 'accept-as-accepted' | 'accept-as-voided';
 
+type PreparedRcSubmit = {
+  summary: DailySummary;
+  documents: Document[];
+  xml: string;
+  fileBaseName: string;
+  xmlFileName: string;
+  /** RC altas: link docs only after SUNAT returns a ticket. */
+  linkDocumentsOnTicket?: boolean;
+};
+
 @Injectable()
 export class DailySummariesService {
   constructor(
@@ -266,17 +276,13 @@ export class DailySummariesService {
         }),
       );
 
-      for (const doc of documents) {
-        doc.dailySummaryId = summary.id;
-        await documentRepo.save(doc);
-      }
-
       return {
         summary,
         documents,
         xml: signedXml.xml,
         fileBaseName: signedXml.fileBaseName,
         xmlFileName: signedXml.xmlFileName,
+        linkDocumentsOnTicket: true,
       };
     });
 
@@ -435,13 +441,7 @@ export class DailySummariesService {
 
   private async submitRcToSunat(
     company: Company,
-    prepared: {
-      summary: DailySummary;
-      documents: Document[];
-      xml: string;
-      fileBaseName: string;
-      xmlFileName: string;
-    },
+    prepared: PreparedRcSubmit,
     outcome: SummarySubmitOutcome,
     hintWithTicket: string,
   ): Promise<Record<string, unknown>> {
@@ -458,6 +458,13 @@ export class DailySummariesService {
       prepared.summary.ticket = sendResult.ticket;
       prepared.summary.status = DailySummaryStatus.PROCESSING;
       await this.dailySummaryRepository.save(prepared.summary);
+
+      if (prepared.linkDocumentsOnTicket) {
+        await this.linkAltaDocumentsToSummary(
+          prepared.summary,
+          prepared.documents,
+        );
+      }
 
       const statusResult = await this.pollSummaryStatus(
         company,
@@ -585,6 +592,36 @@ export class DailySummariesService {
       doc.dailySummaryId = null;
       await this.documentRepository.save(doc);
     }
+  }
+
+  private async linkAltaDocumentsToSummary(
+    summary: DailySummary,
+    documents: Document[],
+  ): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      const documentRepo = manager.getRepository(Document);
+
+      for (const doc of documents) {
+        const locked = await documentRepo.findOne({
+          where: { id: doc.id, companyId: summary.companyId },
+          lock: { mode: 'pessimistic_write' },
+        });
+
+        if (
+          !locked ||
+          locked.status !== DocumentStatus.SIGNED ||
+          locked.dailySummaryId !== null
+        ) {
+          throw new BadRequestException(
+            `Document ${doc.serie}-${doc.correlativo} is no longer available for RC`,
+          );
+        }
+
+        locked.dailySummaryId = summary.id;
+        await documentRepo.save(locked);
+        doc.dailySummaryId = summary.id;
+      }
+    });
   }
 
   private async findAltaRcDocuments(
@@ -799,6 +836,25 @@ export class DailySummariesService {
     issueDate: string,
     summaryRepo: Repository<DailySummary>,
   ): Promise<void> {
+    const inFlightWithoutTicket = await summaryRepo.findOne({
+      where: {
+        companyId,
+        issueDate,
+        summaryType: DailySummaryType.RC,
+        status: In([DailySummaryStatus.DRAFT, DailySummaryStatus.SUBMITTED]),
+        ticket: IsNull(),
+      },
+      order: { correlativo: 'DESC' },
+    });
+
+    if (inFlightWithoutTicket) {
+      throw new BadRequestException({
+        message: `RC ${inFlightWithoutTicket.summaryCode} is still being submitted. Wait for it to finish or retry shortly.`,
+        dailySummaryId: inFlightWithoutTicket.id,
+        status: inFlightWithoutTicket.status,
+      });
+    }
+
     const pendingWithTicket = await summaryRepo.findOne({
       where: {
         companyId,
@@ -849,12 +905,18 @@ export class DailySummariesService {
     outcome: SummarySubmitOutcome = 'accept-as-accepted',
   ): Promise<never> {
     const classified = classifySunatSubmissionError(error);
-    summary.status =
-      classified.status === DocumentStatus.FAILED
-        ? DailySummaryStatus.FAILED
-        : DailySummaryStatus.REJECTED;
     summary.errorMessage = classified.errorMessage;
-    await this.dailySummaryRepository.save(summary);
+
+    if (!summary.ticket && outcome === 'accept-as-accepted') {
+      summary.status = DailySummaryStatus.CANCELLED;
+      await this.dailySummaryRepository.save(summary);
+    } else {
+      summary.status =
+        classified.status === DocumentStatus.FAILED
+          ? DailySummaryStatus.FAILED
+          : DailySummaryStatus.REJECTED;
+      await this.dailySummaryRepository.save(summary);
+    }
 
     if (!summary.ticket) {
       if (outcome === 'accept-as-voided') {
@@ -862,7 +924,7 @@ export class DailySummariesService {
           revertBoletaVoidPending(doc);
           await this.documentRepository.save(doc);
         }
-      } else {
+      } else if (outcome !== 'accept-as-accepted') {
         await this.releaseDocumentsFromSummary(documents);
       }
     }
@@ -872,7 +934,11 @@ export class DailySummariesService {
       dailySummaryId: summary.id,
       status: summary.status,
       ticket: summary.ticket,
-      hint: summary.ticket ? hintWithTicket : undefined,
+      hint: summary.ticket
+        ? hintWithTicket
+        : outcome === 'accept-as-accepted'
+          ? 'SUNAT did not return a ticket. Boletas were not linked; you may POST /v1/daily-summaries again.'
+          : undefined,
     });
   }
 

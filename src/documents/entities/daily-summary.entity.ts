@@ -24,6 +24,7 @@ export enum DailySummaryStatus {
   ACCEPTED = 'accepted',
   REJECTED = 'rejected',
   FAILED = 'failed',
+  CANCELLED = 'cancelled',
 }
 
 @Entity('daily_summaries')

@@ -477,7 +477,38 @@ Incluye automáticamente boletas/notas `signed` sin RC del `referenceDate`.
 
 Default de ambas fechas: **hoy**.
 
-**Response `200`:**
+#### Qué hace el endpoint (orden)
+
+1. **Transacción local:** crea fila en `daily_summaries` (`draft`, XML firmado). Los documentos **no** reciben `daily_summary_id` todavía.
+2. **`sendSummary`** → SUNAT devuelve **ticket** (número de cola).
+3. **Tras ticket:** vincula documentos (`daily_summary_id = rc.id`); siguen en `signed`.
+4. **`getStatus`** (poll automático, hasta 5× cada 2 s).
+5. **Resultado:** actualiza RC y documentos según CDR (`accepted`, `processing`, `rejected`, etc.).
+
+#### Estados del RC (`daily_summaries.status`)
+
+| Estado | Significado |
+|--------|-------------|
+| `draft` | RC creado en TX; aún no enviado o enviando |
+| `submitted` | Marcando envío a SUNAT |
+| `processing` | Ticket recibido; SUNAT procesando o poll pendiente |
+| `accepted` | CDR OK → documentos del RC → `accepted` |
+| `rejected` | SUNAT rechazó → documentos liberados (`daily_summary_id=null`), `signed` |
+| `failed` | Error técnico **con ticket** (timeout en poll, etc.) |
+| `cancelled` | Envío falló **sin ticket**; documentos **nunca** se vincularon |
+
+#### Persistencia en BD (RC altas)
+
+| Momento | `daily_summaries` | `documents` |
+|---------|-------------------|-------------|
+| TX local OK | `draft`, sin `ticket` | `signed`, **`daily_summary_id=null`** |
+| Ticket recibido | `processing`, `ticket` | `signed`, **`daily_summary_id=rc.id`** |
+| SUNAT acepta | `accepted`, `cdr_xml` | **`accepted`** |
+| SUNAT rechaza | `rejected` | `signed`, **`daily_summary_id=null`** |
+| Falla **sin ticket** | **`cancelled`** | `signed`, **`daily_summary_id=null`** (sin cambio) |
+| Falla **con ticket** | `failed` | `signed`, ligados al RC → usar `/status` |
+
+**Response `200` (aceptado):**
 
 ```json
 {
@@ -492,9 +523,63 @@ Default de ambas fechas: **hoy**.
 }
 ```
 
+**Response `200` (aún procesando):**
+
+```json
+{
+  "id": "uuid-rc",
+  "status": "processing",
+  "ticket": "2026123456789",
+  "sunat": {
+    "statusCode": "98",
+    "description": "En proceso",
+    "processing": true
+  }
+}
+```
+
 Estados intermedios: `processing`, `submitted` → usar `/status` para poll.
 
-**Error con ticket (beta común):** body incluye `dailySummaryId`, `ticket`, `hint` → **no reenviar RC**, solo poll `/status`.
+#### Errores y reintento (RC altas)
+
+| Respuesta error | `ticket` | `status` RC | Documentos | Acción UI |
+|-----------------|----------|-------------|------------|-----------|
+| Fallo al enviar / sin ticket | `null` | `cancelled` | Siguen `signed`, sin ligar | **Reenviar** `POST /daily-summaries` |
+| Fallo en poll / beta | presente | `failed` | Ligados al RC | **`POST /daily-summaries/:id/status`** |
+| RC pendiente con ticket | presente | `processing` | Ligados | **`POST /.../status`** (no RC nuevo) |
+| SUNAT rechazó CDR | presente | `rejected` | Liberados | Corregir y **nuevo** `POST /daily-summaries` |
+
+**Error sin ticket (puede reenviar RC):**
+
+```json
+{
+  "statusCode": 400,
+  "message": {
+    "message": "SUNAT HTTP 500 ...",
+    "dailySummaryId": "uuid-rc",
+    "ticket": null,
+    "status": "cancelled",
+    "hint": "SUNAT did not return a ticket. Boletas were not linked; you may POST /v1/daily-summaries again."
+  }
+}
+```
+
+**Error con ticket (beta común — no reenviar RC):**
+
+```json
+{
+  "statusCode": 400,
+  "message": {
+    "message": "SUNAT HTTP 401 ...",
+    "dailySummaryId": "uuid-rc",
+    "ticket": "2026123456789",
+    "status": "failed",
+    "hint": "RC was submitted; poll status with POST /v1/daily-summaries/:id/status"
+  }
+}
+```
+
+**Regla UI:** si hay `ticket` → **Consultar estado** (`/status`). Si `ticket` es `null` y `status` es `cancelled` → **Reenviar RC**.
 
 ---
 
@@ -575,7 +660,9 @@ Solo facturas `01` en `accepted`.
 
 ### `POST /v1/daily-summaries/:id/status` — Polling
 
-Sin body. Reconsulta ticket SUNAT. Usar para RC **y** RA.
+Sin body. Reconsulta ticket SUNAT con el mismo poll interno (hasta 5× cada 2 s). Usar para RC **y** RA cuando el RC/RA quedó en `processing` o `failed` **con ticket**.
+
+Requiere que el resumen tenga `ticket` (si el envío falló sin ticket, el RC altas queda `cancelled` y los documentos no están ligados — reenviar con `POST /daily-summaries`).
 
 ```typescript
 async function pollUntilDone(summaryId: string, token: string) {
@@ -1020,7 +1107,9 @@ POST /boletas
   → guardar id, status=signed
 GET  /documents?issueDate=hoy&pendingRc=true   (opcional: verificar)
 POST /daily-summaries { referenceDate: hoy }
-  → si processing: POST /daily-summaries/:id/status (poll)
+  → docs se vinculan al RC solo si SUNAT devuelve ticket
+  → si status=processing o failed con ticket: POST /daily-summaries/:id/status
+  → si status=cancelled (sin ticket): POST /daily-summaries de nuevo
 GET  /documents/:id                            → status=accepted
 ```
 
@@ -1077,6 +1166,8 @@ POST /daily-summaries/:id/status               → id del RA en respuesta
 
 ### Negocio / SUNAT (`400` con objeto)
 
+**RC pendiente con ticket (consultar, no reenviar):**
+
 ```json
 {
   "statusCode": 400,
@@ -1090,7 +1181,28 @@ POST /daily-summaries/:id/status               → id del RA en respuesta
 }
 ```
 
-**Regla UI:** si hay `ticket` en error → botón **Consultar estado**, no reenviar RC/RA.
+**RC altas fallido sin ticket (reenviar RC):**
+
+```json
+{
+  "statusCode": 400,
+  "message": {
+    "message": "SUNAT HTTP 500 ...",
+    "dailySummaryId": "uuid-rc",
+    "ticket": null,
+    "status": "cancelled",
+    "hint": "SUNAT did not return a ticket. Boletas were not linked; you may POST /v1/daily-summaries again."
+  }
+}
+```
+
+**Regla UI:**
+
+| Condición | Botón |
+|-----------|--------|
+| `ticket` presente | **Consultar estado** → `POST /daily-summaries/:id/status` |
+| `ticket` null y `status=cancelled` | **Reenviar RC** → `POST /daily-summaries` |
+| `status=rejected` (SUNAT rechazó CDR) | Mostrar error → corregir → **nuevo** `POST /daily-summaries` |
 
 ### No autorizado (`401`) / No encontrado (`404`)
 
