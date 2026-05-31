@@ -534,6 +534,162 @@ Mismo body. Requiere documento afectado.
 }
 ```
 
+#### Integración frontend — NC modo global (v1)
+
+En v1 el front emite NC con **una sola línea** en `items[]` (`codigo: "AJUSTE"`). No se desglosa por producto. El monto lo ingresa el usuario **con IGV**; el front convierte a `precioUnitario` sin IGV.
+
+**Pantalla sugerida**
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│  Nota de crédito — Boleta B001-000012                        │
+├─────────────────────────────────────────────────────────────┤
+│  Doc. afectado    B001-000012          Total vendido: 200.00 │
+│  Cliente          (readonly, del doc.)                        │
+│  Motivo SUNAT     [ Descuento global        ▼ ]  cat. 09    │
+│  Importe a        [  40.00  ]  S/ (con IGV)                  │
+│  creditar         Base: 33.90  │  IGV: 6.10  │  Total: 40.00 │
+├─────────────────────────────────────────────────────────────┤
+│                              [ Emitir nota de crédito ]       │
+└─────────────────────────────────────────────────────────────┘
+```
+
+**Flujo**
+
+1. Usuario elige boleta/factura `accepted` (o `signed` si NC mismo día) → `GET /v1/documents/:id`.
+2. Mostrar `total` / `payload.totals.total` del doc. afectado (tope máximo del crédito).
+3. Usuario elige **motivo** (select catálogo 09) e **importe a creditar** (con IGV).
+4. Front arma **un ítem** y `POST /v1/credit-notes`.
+5. Boleta `03` → RC del día + polling. Factura `01` → CDR en la misma respuesta.
+
+**Armar el JSON (siempre 1 línea)**
+
+```typescript
+const IGV_FACTOR = 1.18;
+
+function roundMoney(n: number) {
+  return Math.round(n * 100) / 100;
+}
+
+function buildGlobalCreditNotePayload(input: {
+  serie: string; // BC01 boleta | FC01 factura
+  moneda: string;
+  documentoAfectadoId: string;
+  cliente: { tipoDoc: string; numDoc: string; razonSocial: string };
+  creditAmountWithIgv: number;
+  motivoCodigo: string;
+  motivoDescripcion: string;
+}) {
+  const precioUnitario = roundMoney(input.creditAmountWithIgv / IGV_FACTOR);
+  return {
+    serie: input.serie,
+    moneda: input.moneda,
+    documentoAfectadoId: input.documentoAfectadoId,
+    cliente: input.cliente,
+    items: [
+      {
+        codigo: 'AJUSTE',
+        descripcion: input.motivoDescripcion,
+        cantidad: 1,
+        precioUnitario,
+      },
+    ],
+    motivoCodigo: input.motivoCodigo,
+    motivoDescripcion: input.motivoDescripcion,
+  };
+}
+```
+
+**Validaciones UI**
+
+| Regla | Detalle |
+|-------|---------|
+| `creditAmountWithIgv > 0` | Obligatorio |
+| `creditAmountWithIgv ≤ totalDocAfectado` | No creditar más que la venta |
+| `motivoCodigo` + `motivoDescripcion` | Enviar siempre (el backend defaultea `01` si faltan) |
+| Boleta **no entregada** | **No** NC → usar RC void (`POST /daily-summaries/void`) |
+| Anular **factura completa** sin entrega comercial | Preferir **RA** (`POST /voided-documents`) |
+
+**Catálogo SUNAT 09 — `motivoCodigo` / `motivoDescripcion` (select frontend)**
+
+Usar en `DiscrepancyResponse` del XML. Lista para poblar el select (confirmar textos con contabilidad):
+
+| Código | Descripción (label select) | Cuándo usar en v1 global |
+|--------|----------------------------|---------------------------|
+| `01` | Anulación de la operación | NC por el **100%** del comprobante (todo lo consumido / anula la venta) |
+| `02` | Anulación por error en el RUC | Cliente identificado con RUC incorrecto |
+| `03` | Corrección por error en la descripción | Error en texto/concepto del comprobante |
+| `04` | Descuento global | Crédito **parcial** (menor al total) — caso habitual del input “Importe a creditar” |
+| `05` | Descuento por ítem | *Reservado* (v2 desglose por producto; hoy no usar) |
+| `06` | Devolución total | Devolución **100%** de la operación (alternativa a `01`) |
+| `07` | Devolución parcial | Crédito parcial por devolución — usable si el monto &lt; total |
+| `08` | Bonificación | Bonificación post-venta |
+| `09` | Disminución en el valor | Ajuste a la baja del monto (parcial o error de cobro) |
+| `10` | Otros conceptos | Casos no cubiertos arriba |
+| `11` | Ajustes de operaciones de exportación | Exportación |
+| `12` | Ajustes montos y/o fechas de pago | IVAP / fechas pago |
+| `13` | Corrección monto neto pendiente de pago | Facturas al crédito |
+
+**Guía rápida de decisión (v1)**
+
+```
+¿Se entregó al cliente?
+├─ NO + boleta accepted → RC void (no NC)
+└─ SÍ → ¿Importe a creditar = total del documento?
+         ├─ SÍ → motivo 01 o 06  (anulación / devolución total)
+         └─ NO → motivo 04 o 09  (descuento global / disminución valor)
+```
+
+**Ejemplo — crédito parcial S/ 40 (global)**
+
+Boleta total S/ 200; acreditas S/ 40:
+
+```json
+{
+  "serie": "BC01",
+  "moneda": "PEN",
+  "documentoAfectadoId": "uuid-boleta",
+  "cliente": { "tipoDoc": "1", "numDoc": "12345678", "razonSocial": "CLIENTE DEMO" },
+  "items": [
+    {
+      "codigo": "AJUSTE",
+      "descripcion": "Descuento global a favor del cliente",
+      "cantidad": 1,
+      "precioUnitario": 33.90
+    }
+  ],
+  "motivoCodigo": "04",
+  "motivoDescripcion": "Descuento global"
+}
+```
+
+**Ejemplo — NC por TODO lo consumido (100%)**
+
+Importe = total del doc. (ej. S/ 200 con IGV → base `169.49`):
+
+```json
+{
+  "serie": "BC01",
+  "moneda": "PEN",
+  "documentoAfectadoId": "uuid-boleta",
+  "cliente": { "tipoDoc": "1", "numDoc": "12345678", "razonSocial": "CLIENTE DEMO" },
+  "items": [
+    {
+      "codigo": "AJUSTE",
+      "descripcion": "Anulación de la operación",
+      "cantidad": 1,
+      "precioUnitario": 169.49
+    }
+  ],
+  "motivoCodigo": "01",
+  "motivoDescripcion": "Anulación de la operación"
+}
+```
+
+`codigo` `AJUSTE` es interno del emisor; SUNAT **no** valida ese código. Sí valida coherencia de montos, referencia al doc. afectado y **`motivoCodigo`** catálogo 09.
+
+Tipos TS del select: [frontend-tipos-api.md](../.cursor/skills/sunat-fe/frontend-tipos-api.md). Flujo pantallas: [frontend-guia.md](../.cursor/skills/sunat-fe/frontend-guia.md).
+
 **Si afecta boleta `03`:** status `signed` → incluir en RC.
 
 ```json

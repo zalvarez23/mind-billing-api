@@ -261,6 +261,77 @@ export interface CreateNoteRequest {
 
 ---
 
+## NC modo global (v1) — tipos para frontend
+
+Guía completa: [docs/API-REFERENCE.md](../../../docs/API-REFERENCE.md) → *Integración frontend — NC modo global*.
+
+```typescript
+/** Catálogo SUNAT 09 — opciones del select motivo */
+export const SUNAT_NC_MOTIVO_OPTIONS = [
+  { code: '01', label: 'Anulación de la operación', when: 'NC 100% del comprobante' },
+  { code: '02', label: 'Anulación por error en el RUC', when: 'RUC cliente incorrecto' },
+  { code: '03', label: 'Corrección por error en la descripción', when: 'Error en concepto' },
+  { code: '04', label: 'Descuento global', when: 'Crédito parcial (habitual v1)' },
+  { code: '05', label: 'Descuento por ítem', when: 'Reservado v2' },
+  { code: '06', label: 'Devolución total', when: 'NC 100% / devolución completa' },
+  { code: '07', label: 'Devolución parcial', when: 'Crédito parcial por devolución' },
+  { code: '08', label: 'Bonificación', when: 'Bonificación post-venta' },
+  { code: '09', label: 'Disminución en el valor', when: 'Ajuste a la baja / error cobro' },
+  { code: '10', label: 'Otros conceptos', when: 'Otros' },
+  { code: '11', label: 'Ajustes de operaciones de exportación', when: 'Exportación' },
+  { code: '12', label: 'Ajustes montos y/o fechas de pago', when: 'IVAP / fechas' },
+  { code: '13', label: 'Corrección monto neto pendiente de pago', when: 'Factura al crédito' },
+] as const;
+
+export type SunatNcMotivoCode = (typeof SUNAT_NC_MOTIVO_OPTIONS)[number]['code'];
+
+export interface GlobalCreditNoteForm {
+  documentoAfectadoId: string;
+  docTotalWithIgv: number;
+  creditAmountWithIgv: number;
+  motivoCodigo: SunatNcMotivoCode;
+  motivoDescripcion: string;
+  cliente: ClienteInput;
+  serie: string;
+  moneda: string;
+}
+
+const IGV_FACTOR = 1.18;
+
+export function buildGlobalCreditNoteRequest(
+  form: GlobalCreditNoteForm,
+): CreateNoteRequest {
+  const precioUnitario = Math.round((form.creditAmountWithIgv / IGV_FACTOR) * 100) / 100;
+  return {
+    serie: form.serie,
+    moneda: form.moneda,
+    documentoAfectadoId: form.documentoAfectadoId,
+    cliente: form.cliente,
+    items: [
+      {
+        codigo: 'AJUSTE',
+        descripcion: form.motivoDescripcion,
+        cantidad: 1,
+        precioUnitario,
+      },
+    ],
+    motivoCodigo: form.motivoCodigo,
+    motivoDescripcion: form.motivoDescripcion,
+  };
+}
+
+/** Sugerir motivo según importe vs total del doc. afectado */
+export function suggestNcMotivo(
+  creditWithIgv: number,
+  docTotalWithIgv: number,
+): SunatNcMotivoCode {
+  if (creditWithIgv >= docTotalWithIgv) return '01';
+  return '04';
+}
+```
+
+---
+
 ## Resúmenes — requests
 
 ```typescript

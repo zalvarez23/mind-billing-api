@@ -249,9 +249,14 @@ Usuario quiere revertir una boleta accepted
 
 ## Motivos SUNAT en NC (referencia UI)
 
-Campos opcionales en `CreateNoteDto`: `motivoCodigo`, `motivoDescripcion`.
+Campos en `CreateNoteDto`: `motivoCodigo`, `motivoDescripcion` (catálogo **09**).
 
-Ejemplos habituales (catálogo SUNAT): `01` anulación de la operación, `06` devolución total, `07` devolución parcial. Validar catálogo vigente con contabilidad.
+**v1 frontend:** NC **modo global** — una línea `AJUSTE`, select motivo + importe con IGV. Catálogo completo y ejemplos: [API-REFERENCE.md](../../../docs/API-REFERENCE.md) → *Integración frontend — NC modo global*; tipos TS: [frontend-tipos-api.md](frontend-tipos-api.md) → *NC modo global*.
+
+| Importe NC vs total doc. | Motivos sugeridos |
+|--------------------------|-------------------|
+| **100%** (todo lo consumido) | `01` Anulación, `06` Devolución total |
+| **Parcial** | `04` Descuento global, `09` Disminución valor |
 
 ---
 

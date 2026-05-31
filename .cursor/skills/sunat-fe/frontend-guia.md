@@ -53,20 +53,20 @@ Dev: `mbak_dev00000000000000000000000001`, login `admin` / `admin123`.
 4. Polling `/status`
 5. Boletas → `voided`
 
-### 5. Nota de crédito boleta — entregada / devolución
+### 5. Nota de crédito boleta — modo global (v1)
 
-1. Confirmar entrega/devolución
-2. `POST /v1/credit-notes` — serie `BC01`, `documentoAfectadoId`
-3. NC queda `signed` → pendiente RC
-4. `POST /v1/daily-summaries` — `referenceDate` = fecha emisión NC
-5. Polling hasta NC `accepted`
+Wireframe y catálogo motivo 09: [API-REFERENCE.md](../../../docs/API-REFERENCE.md) → *Integración frontend — NC modo global*.
 
-### 6. Nota de crédito factura
+1. Confirmar **entrega** al cliente (si no → RC void, no NC).
+2. `GET /v1/documents/:id` — total y cliente del comprobante afectado.
+3. Formulario: select **motivo SUNAT** + input **Importe a creditar (S/ con IGV)**.
+4. Si importe = total doc. → sugerir motivo `01` o `06`; si parcial → `04` o `09`.
+5. `POST /v1/credit-notes` — serie `BC01`, `items[]` con **una** línea `codigo: "AJUSTE"`.
+6. NC `signed` → `POST /v1/daily-summaries` → polling `/status`.
 
-1. Buscar factura `accepted`
-2. `POST /v1/credit-notes` — serie `FC01`, `documentoAfectadoId`
-3. CDR inmediato en respuesta — **no** pedir RC
-4. Factura original sigue `accepted` en listado
+### 6. Nota de crédito factura — modo global (v1)
+
+Mismo formulario global; serie `FC01`. CDR inmediato — **no** RC. Factura original sigue `accepted`.
 
 ### 7. Anular facturas (RA)
 
