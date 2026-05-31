@@ -172,6 +172,27 @@ export interface LoginRequest {
 }
 ```
 
+### `CompanyResponse` (login, `/auth/me`, `GET /companies/:id`)
+
+```typescript
+export interface CompanyResponse {
+  id: string;
+  ruc: string;
+  businessName: string;
+  tradeName: string | null;
+  address: string | null;
+  email: string | null;
+  phone: string | null;
+  ubigeo: string | null;
+  sunatEnvironment: SunatEnvironment;
+  solUsername: string | null;
+  hasSolPassword: boolean;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+```
+
 ### Response `POST /v1/auth/login`
 
 ```typescript
@@ -183,12 +204,7 @@ export interface LoginResponse {
     username: string;
     fullName: string | null;
   };
-  company: {
-    id: string;
-    ruc: string;
-    businessName: string;
-    sunatEnvironment: SunatEnvironment;
-  };
+  company: CompanyResponse;
 }
 ```
 
@@ -197,9 +213,7 @@ export interface LoginResponse {
 ```typescript
 export interface MeResponse {
   user: LoginResponse['user'];
-  company: LoginResponse['company'] & {
-    tradeName: string | null;
-  };
+  company: CompanyResponse;
 }
 ```
 

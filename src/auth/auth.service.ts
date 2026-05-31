@@ -7,6 +7,7 @@ import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import * as bcrypt from 'bcrypt';
 import { Repository } from 'typeorm';
+import { toCompanyResponse } from '../companies/company.mapper';
 import { Company } from '../companies/entities/company.entity';
 import { User } from '../users/entities/user.entity';
 import { LoginDto } from './dto/login.dto';
@@ -77,12 +78,7 @@ export class AuthService {
         username: user.username,
         fullName: user.fullName,
       },
-      company: {
-        id: company.id,
-        ruc: company.ruc,
-        businessName: company.businessName,
-        sunatEnvironment: company.sunatEnvironment,
-      },
+      company: toCompanyResponse(company),
     };
   }
 
@@ -93,13 +89,7 @@ export class AuthService {
         username: user.username,
         fullName: user.fullName,
       },
-      company: {
-        id: company.id,
-        ruc: company.ruc,
-        businessName: company.businessName,
-        tradeName: company.tradeName,
-        sunatEnvironment: company.sunatEnvironment,
-      },
+      company: toCompanyResponse(company),
     };
   }
 }

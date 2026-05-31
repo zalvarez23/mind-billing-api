@@ -147,7 +147,7 @@ const res = await fetch(`/v1/companies/${companyId}`, {
 const company = await res.json();
 ```
 
-**Diferencia con `GET /auth/me`:** `/auth/me` devuelve usuario + resumen de empresa; `/companies/:id` devuelve **todos** los campos de la empresa (`address`, `ubigeo`, `solUsername`, `hasSolPassword`, fechas).
+**Diferencia con `GET /auth/me` y login:** los tres devuelven el mismo objeto `company` (`CompanyResponse`). `/auth/me` incluye además el `user`; `/companies/:id` es útil para refrescar solo la empresa sin re-login.
 
 ### `PATCH /v1/companies/:id` — Actualizar empresa
 
@@ -300,8 +300,18 @@ Catálogo 06: `1` DNI, `6` RUC, etc.
   "company": {
     "id": "00000000-0000-4000-8000-000000000001",
     "ruc": "20000000001",
-    "businessName": "...",
-    "sunatEnvironment": "beta"
+    "businessName": "EMPRESA DEV SAC",
+    "tradeName": "Empresa Dev",
+    "address": "Av. Dev 123, Lima",
+    "email": "facturacion@empresa-dev.test",
+    "phone": "+51999999999",
+    "ubigeo": "150101",
+    "sunatEnvironment": "beta",
+    "solUsername": "20000000001MODDATOS",
+    "hasSolPassword": true,
+    "isActive": true,
+    "createdAt": "2026-05-24T12:00:00.000Z",
+    "updatedAt": "2026-05-24T12:00:00.000Z"
   }
 }
 ```
@@ -335,9 +345,18 @@ const { accessToken } = await res.json();
   "company": {
     "id": "...",
     "ruc": "20000000001",
-    "businessName": "...",
-    "tradeName": null,
-    "sunatEnvironment": "beta"
+    "businessName": "EMPRESA DEV SAC",
+    "tradeName": "Empresa Dev",
+    "address": "Av. Dev 123, Lima",
+    "email": "facturacion@empresa-dev.test",
+    "phone": "+51999999999",
+    "ubigeo": "150101",
+    "sunatEnvironment": "beta",
+    "solUsername": "20000000001MODDATOS",
+    "hasSolPassword": true,
+    "isActive": true,
+    "createdAt": "...",
+    "updatedAt": "..."
   }
 }
 ```
