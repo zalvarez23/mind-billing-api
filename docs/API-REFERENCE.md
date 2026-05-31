@@ -1363,8 +1363,8 @@ Cabeceras sin `payload` completo. Para ítems → detalle por id.
 | `issueDate` | `YYYY-MM-DD`           | —       | Día exacto (prioridad sobre rango)   |
 | `from`      | `YYYY-MM-DD`           | —       | Inicio rango                         |
 | `to`        | `YYYY-MM-DD`           | —       | Fin rango                            |
-| `docType`   | `01`\|`03`\|`07`\|`08` | —       | Tipo comprobante                     |
-| `status`    | string                 | —       | `signed`, `accepted`, `voided`, etc. |
+| `docType`   | string                 | —       | Tipo(s): uno (`03`) o varios separados por coma (`03,07,08`). También `docType=03&docType=07`. |
+| `status`    | string                 | —       | Estado(s): uno (`accepted`) o varios (`accepted,signed`) |
 | `serie`     | string                 | —       | ej. `B001` (match exacto)            |
 | `pendingRc` | boolean                | —       | `true` = signed sin RC (03/07/08)    |
 | `q`         | string                 | —       | ILIKE en `serie`, `correlativo`, `serie-correlativo`, `cliente.numDoc`, `cliente.razonSocial`, `id` |
@@ -1406,6 +1406,7 @@ Cabeceras sin `payload` completo. Para ítems → detalle por id.
 GET /v1/documents?issueDate=2026-05-26
 GET /v1/documents?issueDate=2026-05-26&pendingRc=true
 GET /v1/documents?from=2026-05-01&to=2026-05-31&docType=03&status=accepted&page=1&limit=10
+GET /v1/documents?docType=03,07,08&status=accepted,signed
 GET /v1/documents?q=B001-5
 GET /v1/documents?q=20100066603&docType=03
 GET /v1/documents?q=VARIOS&status=signed

@@ -1,5 +1,7 @@
 import { Transform, Type } from 'class-transformer';
 import {
+  ArrayMinSize,
+  IsArray,
   IsBoolean,
   IsDateString,
   IsEnum,
@@ -12,6 +14,7 @@ import {
   Min,
 } from 'class-validator';
 import { DocumentStatus } from '../../common/enums';
+import { toQueryStringArray } from '../../common/query-param.util';
 
 const SUNAT_DOC_TYPES = ['01', '03', '07', '08'] as const;
 
@@ -31,13 +34,21 @@ export class ListDocumentsQueryDto {
   @IsDateString()
   to?: string;
 
+  /** Uno o varios tipos: `03` o `03,07,08` (también `docType=03&docType=07`). */
   @IsOptional()
-  @IsIn(SUNAT_DOC_TYPES)
-  docType?: string;
+  @Transform(({ value }) => toQueryStringArray(value))
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsIn(SUNAT_DOC_TYPES, { each: true })
+  docType?: string[];
 
+  /** Uno o varios estados: `accepted` o `accepted,signed`. */
   @IsOptional()
-  @IsEnum(DocumentStatus)
-  status?: DocumentStatus;
+  @Transform(({ value }) => toQueryStringArray(value))
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsEnum(DocumentStatus, { each: true })
+  status?: DocumentStatus[];
 
   @IsOptional()
   @IsString()

@@ -611,12 +611,14 @@ export class DocumentsService {
       }
     }
 
-    if (query.docType) {
-      qb.andWhere('doc.docType = :docType', { docType: query.docType });
+    if (query.docType?.length) {
+      qb.andWhere('doc.docType IN (:...docTypes)', { docTypes: query.docType });
     }
 
-    if (query.status) {
-      qb.andWhere('doc.status = :status', { status: query.status });
+    if (query.status?.length) {
+      qb.andWhere('doc.status IN (:...statuses)', {
+        statuses: query.status,
+      });
     }
 
     if (query.serie) {

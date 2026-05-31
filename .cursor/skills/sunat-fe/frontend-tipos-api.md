@@ -473,10 +473,13 @@ export interface ListDocumentsQuery {
   issueDate?: IsoDate;
   from?: IsoDate;
   to?: IsoDate;
-  docType?: SunatDocType;
-  status?: DocumentStatus;
+  /** Uno o varios: `03` o `['03','07']` → query `docType=03,07` */
+  docType?: SunatDocType | SunatDocType[];
+  /** Uno o varios: `accepted` o `['accepted','signed']` */
+  status?: DocumentStatus | DocumentStatus[];
   serie?: string;
   pendingRc?: boolean;
+  q?: string;
   page?: number;
   limit?: number;
 }
@@ -490,6 +493,9 @@ GET /v1/documents?issueDate=2026-05-26
 
 // Boletas aceptadas del mes
 GET /v1/documents?from=2026-05-01&to=2026-05-31&docType=03&status=accepted
+
+// Boletas y notas accepted o signed
+GET /v1/documents?docType=03,07,08&status=accepted,signed
 
 // Pendientes RC hoy
 GET /v1/documents?issueDate=2026-05-26&pendingRc=true&page=1&limit=20
@@ -754,7 +760,10 @@ export class BillingApiClient {
   async listDocuments(query: ListDocumentsQuery = {}): Promise<DocumentListResponse> {
     const params = new URLSearchParams();
     for (const [key, value] of Object.entries(query)) {
-      if (value !== undefined && value !== null && value !== '') {
+      if (value === undefined || value === null || value === '') continue;
+      if (Array.isArray(value)) {
+        params.set(key, value.join(','));
+      } else {
         params.set(key, String(value));
       }
     }
