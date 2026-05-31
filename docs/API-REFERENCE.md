@@ -951,6 +951,8 @@ JWT + empresa del token. Listado paginado de resúmenes enviados (RC y RA).
 | `page`          | int                    | `1`     | Página                                           |
 | `limit`         | int                    | `20`    | Máx `100`                                        |
 
+**Orden (fijo):** `createdAt` DESC (más recientes primero — cuándo se creó el registro en BD) → `correlativo` ASC. Los filtros `issueDate` / `from` / `to` / `referenceDate` no cambian el criterio de orden.
+
 **Response `200`:**
 
 ```json

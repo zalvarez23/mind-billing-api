@@ -488,9 +488,9 @@ export class DailySummariesService {
       qb.andWhere('summary.status = :status', { status: query.status });
     }
 
-    qb.orderBy('summary.issueDate', 'DESC').addOrderBy(
+    qb.orderBy('summary.createdAt', 'DESC').addOrderBy(
       'summary.correlativo',
-      'DESC',
+      'ASC',
     );
 
     const [summaries, total] = await qb
