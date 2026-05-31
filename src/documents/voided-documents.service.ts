@@ -12,6 +12,7 @@ import { classifySunatSubmissionError } from '../sunat/sunat-error.util';
 import { CreateVoidedDocumentsDto } from './dto/create-voided-documents.dto';
 import { getBusinessIsoDate } from '../common/date-time.util';
 import { Document } from './entities/document.entity';
+import { readDocumentPayload } from './types/document-payload.types';
 import {
   DailySummary,
   DailySummaryStatus,
@@ -19,6 +20,7 @@ import {
 } from './entities/daily-summary.entity';
 
 const INVOICE_DOC_TYPE = '01';
+const RA_DOC_TYPES = ['01', '07', '08'] as const;
 const STATUS_POLL_ATTEMPTS = 5;
 const STATUS_POLL_DELAY_MS = 2000;
 const DEFAULT_MOTIVO_BAJA = 'ERROR EN DATOS';
@@ -46,28 +48,7 @@ export class VoidedDocumentsService {
     const issueDateYmd = issueDate.replace(/-/g, '');
     const motivoBaja = dto.motivoBaja ?? DEFAULT_MOTIVO_BAJA;
 
-    const invoices = await this.documentRepository.find({
-      where: {
-        id: In(dto.documentIds),
-        companyId: company.id,
-        docType: INVOICE_DOC_TYPE,
-        status: DocumentStatus.ACCEPTED,
-      },
-    });
-
-    if (invoices.length !== dto.documentIds.length) {
-      throw new BadRequestException(
-        'All documentIds must be accepted invoices (01) of this company',
-      );
-    }
-
-    for (const invoice of invoices) {
-      if (invoice.issueDate && invoice.issueDate !== referenceDate) {
-        throw new BadRequestException(
-          `Invoice ${invoice.serie}-${invoice.correlativo} issue date does not match referenceDate ${referenceDate}`,
-        );
-      }
-    }
+    const documents = await this.loadRaDocuments(company.id, dto, referenceDate);
 
     const prepared = await this.dataSource.transaction(async (manager) => {
       const summaryRepo = manager.getRepository(DailySummary);
@@ -87,11 +68,11 @@ export class VoidedDocumentsService {
         correlativo,
       );
 
-      const lines: VoidedLineInput[] = invoices.map((invoice, index) => ({
+      const lines: VoidedLineInput[] = documents.map((document, index) => ({
         lineId: index + 1,
-        docType: invoice.docType,
-        serie: invoice.serie,
-        correlativo: invoice.correlativo,
+        docType: document.docType,
+        serie: document.serie,
+        correlativo: document.correlativo,
         motivoBaja,
       }));
 
@@ -129,14 +110,14 @@ export class VoidedDocumentsService {
         }),
       );
 
-      for (const invoice of invoices) {
-        invoice.dailySummaryId = summary.id;
-        await documentRepo.save(invoice);
+      for (const document of documents) {
+        document.dailySummaryId = summary.id;
+        await documentRepo.save(document);
       }
 
       return {
         summary,
-        invoices,
+        documents,
         xml,
         fileBaseName,
         xmlFileName: `${fileBaseName}.xml`,
@@ -164,12 +145,69 @@ export class VoidedDocumentsService {
 
       return this.applyStatusResult(
         prepared.summary,
-        prepared.invoices,
+        prepared.documents,
         statusResult,
       );
     } catch (error) {
       return await this.handleSubmitError(error, prepared.summary.id);
     }
+  }
+
+  private async loadRaDocuments(
+    companyId: string,
+    dto: CreateVoidedDocumentsDto,
+    referenceDate: string,
+  ): Promise<Document[]> {
+    const documents = await this.documentRepository.find({
+      where: {
+        id: In(dto.documentIds),
+        companyId,
+        docType: In([...RA_DOC_TYPES]),
+        status: DocumentStatus.ACCEPTED,
+      },
+      order: { docType: 'ASC', serie: 'ASC', correlativo: 'ASC' },
+    });
+
+    if (documents.length !== dto.documentIds.length) {
+      throw new BadRequestException(
+        'All documentIds must be accepted invoices or invoice notes (01, 07, 08) of this company',
+      );
+    }
+
+    for (const document of documents) {
+      const label = this.formatRaDocumentLabel(document);
+
+      if (document.dailySummaryId) {
+        throw new BadRequestException(
+          `${label} is already linked to a daily summary (RA in progress or RC note)`,
+        );
+      }
+
+      if (!document.issueDate) {
+        throw new BadRequestException(`${label} has no issueDate`);
+      }
+
+      if (document.issueDate !== referenceDate) {
+        throw new BadRequestException(
+          `${label} issue date does not match referenceDate ${referenceDate}`,
+        );
+      }
+
+      if (document.docType === '07' || document.docType === '08') {
+        const affected = readDocumentPayload(document.payload).documentoAfectado;
+        if (!affected || affected.docType !== INVOICE_DOC_TYPE) {
+          throw new BadRequestException(
+            `${label} must reference an invoice (01); boleta notes use POST /daily-summaries/void`,
+          );
+        }
+      }
+    }
+
+    return documents;
+  }
+
+  private formatRaDocumentLabel(document: Document): string {
+    return `Document ${document.docType} ${document.serie}-${document.correlativo}`;
   }
 
   private async handleSubmitError(
@@ -241,7 +279,7 @@ export class VoidedDocumentsService {
 
   private async applyStatusResult(
     summary: DailySummary,
-    invoices: Document[],
+    documents: Document[],
     statusResult: Awaited<ReturnType<BillServiceClient['getStatus']>>,
   ): Promise<Record<string, unknown>> {
     summary.statusCode = statusResult.statusCode;
@@ -271,9 +309,9 @@ export class VoidedDocumentsService {
       summary.errorMessage = null;
       await this.dailySummaryRepository.save(summary);
 
-      for (const invoice of invoices) {
-        invoice.status = DocumentStatus.VOIDED;
-        await this.documentRepository.save(invoice);
+      for (const document of documents) {
+        document.status = DocumentStatus.VOIDED;
+        await this.documentRepository.save(document);
       }
 
       return {
@@ -286,7 +324,7 @@ export class VoidedDocumentsService {
           statusCode: statusResult.statusCode,
           description: statusResult.description,
           accepted: true,
-          voidedCount: invoices.length,
+          voidedCount: documents.length,
         },
       };
     }
@@ -297,9 +335,9 @@ export class VoidedDocumentsService {
       statusResult.description ?? 'SUNAT rejected voided documents';
     await this.dailySummaryRepository.save(summary);
 
-    for (const invoice of invoices) {
-      invoice.dailySummaryId = null;
-      await this.documentRepository.save(invoice);
+    for (const document of documents) {
+      document.dailySummaryId = null;
+      await this.documentRepository.save(document);
     }
 
     throw new BadRequestException({

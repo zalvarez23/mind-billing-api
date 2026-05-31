@@ -81,7 +81,7 @@ Informa boletas y notas que no van por `sendBill`.
 |-----|----------|------------|
 | Boleta `03` | Omitir del RC | Void boleta ✅ (`POST /daily-summaries/void`) |
 | NC `07` / ND `08` (boleta) | Omitir del RC | Void nota ✅ (`POST /daily-summaries/void`) |
-| NC / ND factura | `sendBill` | Otro flujo; RA para factura si aplica |
+| NC / ND factura | `sendBill` | RA ✅ (`POST /voided-documents`) |
 
 **En una línea:** void RC = boletas `03` y notas `07`/`08` ya `accepted` en RC (`dailySummaryId`). NC/ND sobre factura no entran (van por `sendBill`).
 
@@ -113,7 +113,7 @@ Informa boletas y notas que no van por `sendBill`.
 ## RA — Resumen de bajas (facturas)
 
 - Endpoint: `POST /v1/voided-documents`
-- Solo facturas `01` en estado `accepted`
+- Facturas `01` y notas `07`/`08` sobre factura en `accepted` (sendBill)
 - `referenceDate` debe coincidir con `issueDate` de la factura
 - XML: `VoidedDocuments` con `sac:DocumentSerialID` + `sac:DocumentNumberID`
 - Tras CDR: factura → `voided`

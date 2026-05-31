@@ -246,7 +246,7 @@ Catálogo 06: `1` DNI, `6` RUC, etc.
 | POST   | `/daily-summaries`            | RC altas (boletas/notas `signed`)          |
 | POST   | `/daily-summaries/void/preview` | Vista previa RC anulación (`03`, `07`, `08`) |
 | POST   | `/daily-summaries/void`       | RC anulación boletas y notas (`03`, `07`, `08`) |
-| POST   | `/voided-documents`           | RA baja facturas                           |
+| POST   | `/voided-documents`           | RA baja facturas y notas factura (`01`, `07`, `08`) |
 | GET    | `/daily-summaries`            | Listado RC/RA paginado                     |
 | GET    | `/daily-summaries/:id`        | Detalle RC/RA                              |
 | POST   | `/daily-summaries/:id/status` | Polling ticket SUNAT                       |
@@ -864,14 +864,14 @@ Qué hacer según **estado** del comprobante y si ya fue informado a SUNAT. `POS
 | Boleta `03` | Omitir del RC (no void); emitir doc. correcto si hace falta | **Void boleta** ✅ `POST /daily-summaries/void` (`ConditionCode 3`) |
 | NC `07` (sobre boleta) | Omitir del RC | **Void nota** ✅ `POST /daily-summaries/void` (`ConditionCode 3`) |
 | ND `08` (sobre boleta) | Omitir del RC | **Void nota** ✅ `POST /daily-summaries/void` (`ConditionCode 3`) |
-| NC / ND sobre factura `01` | N/A (`sendBill`, no RC) | Anulación por **otro flujo** (no `POST /daily-summaries/void`); factura vía **RA** si aplica |
+| NC / ND sobre factura `01` | N/A (`sendBill`, no RC) | **RA** ✅ `POST /voided-documents` (`07`/`08` `accepted`, sin RC) |
 
 **Notas:**
 
 - **Void boleta** = anular la **venta** no entregada (`documentIds[]` UUID boletas `03` `accepted` con `dailySummaryId`).
 - **Void nota** = anular NC/ND emitida por error (`documentIds[]` UUID notas `07`/`08` `accepted` con `dailySummaryId`; la boleta afectada **sigue** `accepted`).
 - **NC entregada válida** = crédito post-venta; **no** usar void sobre la boleta original por el mismo caso.
-- **NC/ND factura** van por `sendBill` (sin `dailySummaryId`); no entran en RC void.
+- **NC/ND factura** van por `sendBill`; anular con **`POST /voided-documents`** (RA), no RC void.
 - Todos los `documentIds` del mismo request deben compartir `referenceDate` (= `issueDate` de cada comprobante).
 
 ---
@@ -906,22 +906,29 @@ Tras CDR aceptado: comprobantes → `voided`.
 
 ---
 
-### `POST /v1/voided-documents` — RA (baja facturas)
+### `POST /v1/voided-documents` — RA (comunicación de baja)
 
-Solo facturas `01` en `accepted`.
+Facturas `01` y notas `07`/`08` sobre factura en **`accepted`**, informadas por `sendBill` (sin `dailySummaryId`). No incluye notas sobre boleta (esas van por RC void).
 
 **Body:**
 
 ```json
 {
-  "documentIds": ["uuid-factura"],
+  "documentIds": ["uuid-factura-o-nota"],
   "referenceDate": "2026-05-24",
   "issueDate": "2026-05-26",
   "motivoBaja": "ERROR EN DATOS"
 }
 ```
 
-`referenceDate` debe coincidir con `issueDate` de la factura.
+| Campo           | Notas                                              |
+| --------------- | -------------------------------------------------- |
+| `documentIds`   | UUID[] (`01`, `07` o `08` `accepted` vía sendBill) |
+| `referenceDate` | Fecha emisión **original** del comprobante         |
+| `issueDate`     | Fecha envío del RA (default hoy)                   |
+| `motivoBaja`    | Motivo por línea en el XML RA                      |
+
+`referenceDate` debe coincidir con `issueDate` de cada comprobante. Tras CDR aceptado: docs → `voided`.
 
 **Response:** misma forma que RC (`dailySummaryId` en body de error o `id` en éxito). Polling: `POST /v1/daily-summaries/{id}/status`.
 

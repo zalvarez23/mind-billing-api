@@ -125,7 +125,7 @@ Ver también [proceso-facturacion.md](proceso-facturacion.md), [frontend-guia.md
 |-----|-------------------|---------------------|
 | Boleta `03` | Omitir del RC | Void boleta ✅ |
 | NC `07` / ND `08` | Omitir del RC | Void nota ✅ |
-| NC / ND factura | `sendBill` | Otro flujo (RA factura si aplica) |
+| NC / ND factura | `sendBill` | RA ✅ (`POST /voided-documents`) |
 
 Detalle: [API-REFERENCE.md](../../../docs/API-REFERENCE.md) → *Matriz anulación — RC void por tipo de documento*.
 
