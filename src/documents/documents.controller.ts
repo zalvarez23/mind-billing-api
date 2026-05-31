@@ -23,7 +23,7 @@ import { CreateVoidedDocumentsDto } from './dto/create-voided-documents.dto';
 import { CancelDocumentsDto } from './dto/cancel-documents.dto';
 import { ListDocumentsQueryDto } from './dto/list-documents-query.dto';
 import { DailySummariesService } from './daily-summaries.service';
-import { toDailySummaryResponse } from './daily-summary.mapper';
+import { toDailySummaryDetailResponse, toDailySummaryResponse } from './daily-summary.mapper';
 import { ListDailySummariesQueryDto } from './dto/list-daily-summaries-query.dto';
 import { DocumentsService } from './documents.service';
 import { toDocumentDetailResponse } from './document-detail.mapper';
@@ -166,7 +166,7 @@ export class DailySummariesController {
   @Get(':id')
   async findOne(@CurrentCompany() company: Company, @Param('id') id: string) {
     const summary = await this.dailySummariesService.findById(company.id, id);
-    return toDailySummaryResponse(summary);
+    return toDailySummaryDetailResponse(summary);
   }
 
   @Post(':id/status')

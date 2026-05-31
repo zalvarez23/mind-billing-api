@@ -430,10 +430,15 @@ export class DailySummariesService {
   }
 
   async findById(companyId: string, summaryId: string): Promise<DailySummary> {
-    const summary = await this.dailySummaryRepository.findOne({
-      where: { id: summaryId, companyId },
-      relations: { documents: true },
-    });
+    const summary = await this.dailySummaryRepository
+      .createQueryBuilder('summary')
+      .leftJoinAndSelect('summary.documents', 'doc')
+      .where('summary.id = :summaryId', { summaryId })
+      .andWhere('summary.companyId = :companyId', { companyId })
+      .orderBy('doc.docType', 'ASC')
+      .addOrderBy('doc.serie', 'ASC')
+      .addOrderBy('doc.correlativo', 'ASC')
+      .getOne();
 
     if (!summary) {
       throw new NotFoundException('Daily summary not found');

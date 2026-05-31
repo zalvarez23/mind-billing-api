@@ -2,6 +2,7 @@ import {
   DailySummaryStatus,
   DailySummaryType,
 } from '../entities/daily-summary.entity';
+import { DocumentListItemResponse } from './document-response.types';
 
 export interface DailySummaryResponse {
   id: string;
@@ -17,6 +18,10 @@ export interface DailySummaryResponse {
   documentCount: number;
   createdAt: Date;
   updatedAt: Date;
+}
+
+export interface DailySummaryDetailResponse extends DailySummaryResponse {
+  documents: DocumentListItemResponse[];
 }
 
 export interface DailySummaryListResponse {

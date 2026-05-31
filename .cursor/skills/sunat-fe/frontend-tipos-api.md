@@ -554,7 +554,7 @@ export interface ListDailySummariesQuery {
 }
 
 export interface DailySummaryListResponse {
-  data: DailySummaryDetail[];
+  data: Omit<DailySummaryDetail, 'documents'>[];
   meta: {
     page: number;
     limit: number;
@@ -581,6 +581,8 @@ export interface DailySummaryDetail {
   documentCount: number;
   createdAt: string;
   updatedAt: string;
+  /** Solo en GET /daily-summaries/:id (no en el listado). */
+  documents: DocumentListItem[];
 }
 ```
 

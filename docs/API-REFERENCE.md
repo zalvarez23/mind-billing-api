@@ -994,6 +994,8 @@ curl -s "$BASE/daily-summaries?referenceDate=2026-05-30&summaryType=RC" \
 
 ### `GET /v1/daily-summaries/:id` — Detalle RC/RA
 
+Incluye **`documents[]`**: comprobantes con `daily_summary_id` = id del resumen (misma forma que ítems de `GET /documents`).
+
 **Response `200`:**
 
 ```json
@@ -1008,11 +1010,32 @@ curl -s "$BASE/daily-summaries?referenceDate=2026-05-30&summaryType=RC" \
   "ticket": "2026123456789",
   "statusCode": "0",
   "errorMessage": null,
-  "documentCount": 3,
+  "documentCount": 2,
   "createdAt": "...",
-  "updatedAt": "..."
+  "updatedAt": "...",
+  "documents": [
+    {
+      "id": "...",
+      "docType": "03",
+      "serie": "B001",
+      "correlativo": 5,
+      "status": "accepted",
+      "total": "118.00",
+      "issueDate": "2026-05-26",
+      "dailySummaryId": "...",
+      "cliente": {
+        "tipoDoc": "1",
+        "numDoc": "12345678",
+        "razonSocial": "CLIENTE DEMO"
+      },
+      "createdAt": "...",
+      "updatedAt": "..."
+    }
+  ]
 }
 ```
+
+El listado `GET /v1/daily-summaries` **no** incluye `documents[]` (solo `documentCount`).
 
 ---
 
