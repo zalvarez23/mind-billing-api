@@ -74,3 +74,27 @@ export interface DocumentDetailResponse {
   updatedAt: Date;
   sunat: DocumentSunatSummary | null;
 }
+
+export interface DocumentPrintCliente {
+  tipoDoc: string;
+  numDoc: string;
+  razonSocial: string | null;
+}
+
+/** Datos para representación impresa / QR SUNAT (pipe + DigestValue del XML firmado). */
+export interface DocumentPrintDataResponse {
+  documentId: string;
+  ruc: string;
+  docType: string;
+  serie: string;
+  correlativo: number;
+  igvTotal: string;
+  total: string;
+  issueDate: string | null;
+  status: DocumentStatus;
+  cliente: DocumentPrintCliente | null;
+  /** DigestValue Base64 del XML del emisor; null si no hay xml firmado. */
+  digestValue: string | null;
+  /** Texto listo para codificar en QR; null si falta xml, digest o issueDate. */
+  qrText: string | null;
+}

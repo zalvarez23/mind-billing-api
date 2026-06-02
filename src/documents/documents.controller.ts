@@ -31,6 +31,7 @@ import {
   BoletaCreatedResponse,
   DocumentDetailResponse,
   DocumentListResponse,
+  DocumentPrintDataResponse,
   NoteCreatedResponse,
 } from './types/document-response.types';
 import { VoidedDocumentsService } from './voided-documents.service';
@@ -204,6 +205,14 @@ export class DocumentsController {
   ): Promise<DocumentDetailResponse> {
     const doc = await this.documentsService.findById(company.id, id);
     return toDocumentDetailResponse(doc);
+  }
+
+  @Get(':id/print-data')
+  getPrintData(
+    @CurrentCompany() company: Company,
+    @Param('id') id: string,
+  ): Promise<DocumentPrintDataResponse> {
+    return this.documentsService.getPrintData(company, id);
   }
 
   @Get(':id/xml')

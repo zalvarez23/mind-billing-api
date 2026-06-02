@@ -52,6 +52,7 @@ Resumen rápido:
 |----------|-----|
 | `GET /v1/documents` | Listado paginado (`issueDate`, `docType`, `status`, `pendingRc`, …) |
 | `GET /v1/documents/:id` | Detalle + `payload` (cliente, items) |
+| `GET /v1/documents/:id/print-data` | Impresión + `qrText` (QR pipe SUNAT) |
 | `GET /v1/documents/:id/xml` | UBL firmado |
 | `GET /v1/documents/:id/cdr` | CDR SUNAT |
 
