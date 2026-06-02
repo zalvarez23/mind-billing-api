@@ -73,6 +73,9 @@ export class NoteXmlBuilder {
       ? `  <cbc:${typeCodeTag} listAgencyName="PE:SUNAT" listName="Tipo de Comprobante" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01">${input.noteDocType}</cbc:${typeCodeTag}>\n`
       : '';
 
+    const monetaryTotalTag =
+      rootTag === 'DebitNote' ? 'RequestedMonetaryTotal' : 'LegalMonetaryTotal';
+
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <${rootTag} xmlns="${schema}"
   xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
@@ -157,9 +160,9 @@ ${typeCodeXml}  <cbc:DocumentCurrencyCode listAgencyName="United Nations Economi
       </cac:TaxCategory>
     </cac:TaxSubtotal>
   </cac:TaxTotal>
-  <cac:LegalMonetaryTotal>
+  <cac:${monetaryTotalTag}>
     <cbc:PayableAmount currencyID="${input.moneda}">${totals.total.toFixed(2)}</cbc:PayableAmount>
-  </cac:LegalMonetaryTotal>
+  </cac:${monetaryTotalTag}>
 ${linesXml}
 </${rootTag}>`;
 
