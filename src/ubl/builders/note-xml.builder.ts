@@ -33,7 +33,8 @@ export class NoteXmlBuilder {
     xml: string;
     totals: InvoiceTotals;
   } {
-    return this.build(input, 'DebitNote', 'DebitNoteTypeCode', 'DebitNoteLine');
+    // SUNAT DebitNote XSD: no DebitNoteTypeCode (unlike CreditNote + CreditNoteTypeCode).
+    return this.build(input, 'DebitNote', null, 'DebitNoteLine');
   }
 
   getFileBaseName(
@@ -48,7 +49,7 @@ export class NoteXmlBuilder {
   private build(
     input: NoteBuildInput,
     rootTag: 'CreditNote' | 'DebitNote',
-    typeCodeTag: string,
+    typeCodeTag: 'CreditNoteTypeCode' | null,
     lineTag: string,
   ): { xml: string; totals: InvoiceTotals } {
     const totals = this.calculateTotals(input.items);
@@ -68,6 +69,10 @@ export class NoteXmlBuilder {
         ? 'urn:oasis:names:specification:ubl:schema:xsd:CreditNote-2'
         : 'urn:oasis:names:specification:ubl:schema:xsd:DebitNote-2';
 
+    const typeCodeXml = typeCodeTag
+      ? `  <cbc:${typeCodeTag} listAgencyName="PE:SUNAT" listName="Tipo de Comprobante" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01">${input.noteDocType}</cbc:${typeCodeTag}>\n`
+      : '';
+
     const xml = `<?xml version="1.0" encoding="UTF-8"?>
 <${rootTag} xmlns="${schema}"
   xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
@@ -84,8 +89,7 @@ export class NoteXmlBuilder {
   <cbc:ID>${noteId}</cbc:ID>
   <cbc:IssueDate>${input.issueDate}</cbc:IssueDate>
   <cbc:IssueTime>${input.issueTime}</cbc:IssueTime>
-  <cbc:${typeCodeTag} listAgencyName="PE:SUNAT" listName="Tipo de Comprobante" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo01">${input.noteDocType}</cbc:${typeCodeTag}>
-  <cbc:DocumentCurrencyCode listAgencyName="United Nations Economic Commission for Europe" listID="ISO 4217 Alpha" listName="Currency">${input.moneda}</cbc:DocumentCurrencyCode>
+${typeCodeXml}  <cbc:DocumentCurrencyCode listAgencyName="United Nations Economic Commission for Europe" listID="ISO 4217 Alpha" listName="Currency">${input.moneda}</cbc:DocumentCurrencyCode>
   <cac:DiscrepancyResponse>
     <cbc:ReferenceID>${affectedId}</cbc:ReferenceID>
     <cbc:ResponseCode listAgencyName="PE:SUNAT" listName="Tipo de nota" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo09">${motivoCodigo}</cbc:ResponseCode>
