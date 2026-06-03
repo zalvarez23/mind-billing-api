@@ -1,7 +1,10 @@
+import { Company } from '../companies/entities/company.entity';
 import { Document as BillingDocument } from './entities/document.entity';
+import { resolveDocumentQrText } from './document-qr-text.util';
 import { DocumentDetailResponse } from './types/document-response.types';
 
 export function toDocumentDetailResponse(
+  company: Company,
   doc: BillingDocument,
 ): DocumentDetailResponse {
   const latestSubmission = doc.submissions?.[0];
@@ -16,6 +19,7 @@ export function toDocumentDetailResponse(
     issueDate: doc.issueDate,
     dailySummaryId: doc.dailySummaryId,
     payload: doc.payload,
+    qrText: resolveDocumentQrText(company, doc),
     createdAt: doc.createdAt,
     updatedAt: doc.updatedAt,
     sunat: latestSubmission

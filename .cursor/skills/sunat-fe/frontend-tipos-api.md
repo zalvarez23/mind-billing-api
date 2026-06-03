@@ -523,6 +523,8 @@ export interface DocumentDetail {
   issueDate: IsoDate | null;
   dailySummaryId: string | null;
   payload: DocumentPayload | null;
+  /** Texto pipe listo para QR SUNAT; null sin xml firmado o issueDate */
+  qrText: string | null;
   createdAt: string;
   updatedAt: string;
   sunat: DocumentSunatSummary | null;
@@ -532,34 +534,6 @@ export interface DocumentDetail {
 export type DocumentKey = `${string}-${number}`; // F001-12
 export function documentLabel(d: Pick<DocumentDetail, 'serie' | 'correlativo'>): DocumentKey {
   return `${d.serie}-${d.correlativo}`;
-}
-```
-
-### Impresión / QR `GET /v1/documents/:id/print-data`
-
-```typescript
-export interface DocumentPrintCliente {
-  tipoDoc: string;
-  numDoc: string;
-  razonSocial: string | null;
-}
-
-/** Representación impresa — texto QR SUNAT (pipe). Ver docs/API-REFERENCE.md */
-export interface DocumentPrintData {
-  documentId: string;
-  ruc: string;
-  docType: SunatDocType;
-  serie: string;
-  correlativo: number;
-  igvTotal: string;
-  total: string;
-  issueDate: IsoDate | null;
-  status: DocumentStatus;
-  cliente: DocumentPrintCliente | null;
-  /** DigestValue Base64 del XML del emisor */
-  digestValue: string | null;
-  /** null si no hay XML firmado o issueDate */
-  qrText: string | null;
 }
 ```
 
@@ -704,7 +678,6 @@ En axios/fetch, parsear `error.response.data` como `SunatSubmitError` cuando `st
 | POST | `/daily-summaries/:id/status` | — | `DailySummarySubmitResponse` |
 | GET | `/documents` | query `ListDocumentsQuery` | `DocumentListResponse` |
 | GET | `/documents/:id` | — | `DocumentDetail` |
-| GET | `/documents/:id/print-data` | — | `DocumentPrintData` |
 | GET | `/documents/:id/xml` | — | `{ xml: string }` o stream |
 | GET | `/documents/:id/cdr` | — | `{ cdr: string }` o stream |
 

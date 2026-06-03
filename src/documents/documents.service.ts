@@ -30,9 +30,7 @@ import {
   DocumentListResponse,
   NoteCreatedResponse,
 } from './types/document-response.types';
-import { toDocumentPrintDataResponse } from './document-print-data.mapper';
 import { toDocumentListItemResponse } from './document-list.mapper';
-import { DocumentPrintDataResponse } from './types/document-response.types';
 import { ListDocumentsQueryDto } from './dto/list-documents-query.dto';
 import { CancelDocumentsDto } from './dto/cancel-documents.dto';
 import { markDocumentCancelled } from './types/document-payload.types';
@@ -762,14 +760,6 @@ export class DocumentsService {
     );
 
     return document;
-  }
-
-  async getPrintData(
-    company: Company,
-    documentId: string,
-  ): Promise<DocumentPrintDataResponse> {
-    const document = await this.findById(company.id, documentId);
-    return toDocumentPrintDataResponse(company, document);
   }
 
   async getXml(companyId: string, documentId: string): Promise<string> {

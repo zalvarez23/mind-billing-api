@@ -177,7 +177,7 @@ Usar `GET /v1/documents` con query params (paginado). Detalle con ítems: `GET /
 | NC pendientes RC | `?docType=07&status=signed&issueDate=hoy` (o `08`) |
 | RC/RA historial | `GET /daily-summaries/:id` |
 | Detalle doc (payload + ítems) | `GET /documents/:id` |
-| Imprimir / QR SUNAT | `GET /documents/:id/print-data` → `qrText` |
+| Imprimir / QR SUNAT | `GET /documents/:id` → `qrText` |
 
 ---
 

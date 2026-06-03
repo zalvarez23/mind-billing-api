@@ -251,8 +251,7 @@ Catálogo 06: `1` DNI, `6` RUC, etc.
 | GET    | `/daily-summaries/:id`        | Detalle RC/RA                              |
 | POST   | `/daily-summaries/:id/status` | Polling ticket SUNAT                       |
 | GET    | `/documents`                  | Listado paginado                           |
-| GET    | `/documents/:id`              | Detalle con payload                        |
-| GET    | `/documents/:id/print-data`   | Datos impresión + texto QR SUNAT           |
+| GET    | `/documents/:id`              | Detalle con payload + qrText               |
 | GET    | `/documents/:id/xml`          | XML UBL firmado                            |
 | GET    | `/documents/:id/cdr`          | CDR SUNAT                                  |
 | GET    | `/certificates`               | Listado certificados digitales             |
@@ -1442,7 +1441,18 @@ GET /v1/documents?q=VARIOS&status=signed
 
 ### `GET /v1/documents/:id` — Detalle
 
-Incluye **`payload`** (cliente, items, totals, documentoAfectado).
+Incluye **`payload`** (cliente, items, totals, documentoAfectado) y **`qrText`** (cadena pipe lista para QR SUNAT; `null` sin XML firmado o `issueDate`).
+
+**Formato `qrText` (pipe):** `RUC|tipo|serie|número|IGV|total|fecha|tipoDocCliente|numDocCliente|hash`
+
+**Frontend (QR en ticket):**
+
+```typescript
+const doc = await api.get<DocumentDetail>(`/v1/documents/${id}`);
+if (doc.qrText) {
+  renderQr(doc.qrText);
+}
+```
 
 ```json
 {
@@ -1467,6 +1477,7 @@ Incluye **`payload`** (cliente, items, totals, documentoAfectado).
     "totals": { "subtotal": 100, "igvTotal": 18, "total": 118 },
     "moneda": "PEN"
   },
+  "qrText": "20000000001|03|B001|5|18.00|118.00|2026-05-26|1|12345678|zONmdNTsJRPmT3rtFiZmlyy+K5Diwry6/+sivUVYcvQ=",
   "sunat": { "method": "sendSummary", "statusCode": "0", "errorMessage": null },
   "createdAt": "...",
   "updatedAt": "..."
@@ -1475,74 +1486,6 @@ Incluye **`payload`** (cliente, items, totals, documentoAfectado).
 
 ---
 
-### `GET /v1/documents/:id/print-data` — Impresión y QR
-
-Datos para **representación impresa** (ticket/PDF) y el **texto listo para codificar en QR** según SUNAT (campos separados por `|`).
-
-No sustituye al detalle: no incluye ítems ni `payload` completo. Usar en la pantalla de imprimir; el detalle sigue en `GET /documents/:id`.
-
-| Campo QR (orden SUNAT) | Propiedad en JSON |
-|------------------------|-------------------|
-| RUC emisor | `ruc` |
-| Tipo comprobante | `docType` |
-| Serie | `serie` |
-| Número | `correlativo` (stringificado en `qrText`) |
-| Monto IGV | `igvTotal` |
-| Monto total | `total` |
-| Fecha emisión | `issueDate` (`yyyy-mm-dd`) |
-| Tipo doc. adquirente | `cliente.tipoDoc` o vacío en `qrText` |
-| Número doc. adquirente | `cliente.numDoc` o vacío en `qrText` |
-| Valor resumen (hash) | `digestValue` (`DigestValue` del XML firmado del emisor) |
-
-**`qrText`:** cadena pipe lista para la librería QR del frontend. **`null`** si falta `xml_content`, no se puede extraer `digestValue`, o no hay `issueDate`.
-
-**`digestValue`:** huella Base64 del XML del comprobante (no usar el del CDR).
-
-```json
-{
-  "documentId": "550e8400-e29b-41d4-a716-446655440000",
-  "ruc": "20000000001",
-  "docType": "03",
-  "serie": "B001",
-  "correlativo": 5,
-  "igvTotal": "18.00",
-  "total": "118.00",
-  "issueDate": "2026-05-26",
-  "status": "accepted",
-  "cliente": {
-    "tipoDoc": "1",
-    "numDoc": "12345678",
-    "razonSocial": "Cliente Demo SAC"
-  },
-  "digestValue": "zONmdNTsJRPmT3rtFiZmlyy+K5Diwry6/+sivUVYcvQ=",
-  "qrText": "20000000001|03|B001|5|18.00|118.00|2026-05-26|1|12345678|zONmdNTsJRPmT3rtFiZmlyy+K5Diwry6/+sivUVYcvQ="
-}
-```
-
-Sin cliente en `payload` (campos 8–9 vacíos en el QR):
-
-```json
-{
-  "cliente": null,
-  "digestValue": "abc123==",
-  "qrText": "20000000001|03|B001|1|0.00|10.00|2026-06-02|||abc123=="
-}
-```
-
-**Frontend (ejemplo):**
-
-```typescript
-const print = await api.get<DocumentPrintData>(`/v1/documents/${id}/print-data`);
-if (print.qrText) {
-  renderQr(print.qrText);
-} else {
-  showMessage('QR no disponible: falta XML firmado o fecha de emisión');
-}
-```
-
-**Errores:** **404** documento inexistente o de otra empresa.
-
----
 
 ### `GET /v1/documents/:id/xml`
 
@@ -1566,8 +1509,7 @@ POST /daily-summaries { referenceDate: hoy }
   → docs se vinculan al RC solo si SUNAT devuelve ticket
   → si status=processing o failed con ticket: POST /daily-summaries/:id/status
   → si status=cancelled (sin ticket): POST /daily-summaries de nuevo
-GET  /documents/:id                            → status=accepted
-GET  /documents/:id/print-data                 → qrText para ticket (opcional)
+GET  /documents/:id                            → status=accepted, qrText para ticket
 ```
 
 ### Factura

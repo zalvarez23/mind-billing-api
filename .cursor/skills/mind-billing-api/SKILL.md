@@ -62,8 +62,7 @@ Dev: login `ruc: 20000000001`, `username: admin`, `password: admin123`.
 | GET    | `/v1/daily-summaries/:id`        |
 | POST   | `/v1/daily-summaries/:id/status` |
 | GET    | `/v1/documents`                  |
-| GET    | `/v1/documents/:id`              |
-| GET    | `/v1/documents/:id/print-data` | Impresión + `qrText` SUNAT |
+| GET    | `/v1/documents/:id`              | Detalle documento (+ `qrText`) |
 | GET    | `/v1/documents/:id/xml`          |
 | GET    | `/v1/documents/:id/cdr`          |
 | GET    | `/v1/certificates`               |

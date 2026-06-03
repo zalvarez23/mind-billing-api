@@ -139,8 +139,7 @@ Sprint 5  ░░░░░░░░░░░░░░░░░░░░    0%  GR
 | GET    | `/v1/daily-summaries/:id`        | Detalle RC/RA                  |
 | POST   | `/v1/daily-summaries/:id/status` | Reconsultar ticket (RC y RA)   |
 | GET    | `/v1/documents`                  | Listado paginado (filtros fecha, tipo, status) |
-| GET    | `/v1/documents/:id`              | Detalle documento              |
-| GET    | `/v1/documents/:id/print-data`   | Impresión + texto QR SUNAT     |
+| GET    | `/v1/documents/:id`              | Detalle documento (+ `qrText`) |
 | GET    | `/v1/documents/:id/xml`          | XML                            |
 | GET    | `/v1/documents/:id/cdr`          | CDR                            |
 

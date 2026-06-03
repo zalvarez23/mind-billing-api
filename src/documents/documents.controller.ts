@@ -23,7 +23,7 @@ import { CreateVoidedDocumentsDto } from './dto/create-voided-documents.dto';
 import { CancelDocumentsDto } from './dto/cancel-documents.dto';
 import { ListDocumentsQueryDto } from './dto/list-documents-query.dto';
 import { DailySummariesService } from './daily-summaries.service';
-import { toDailySummaryDetailResponse, toDailySummaryResponse } from './daily-summary.mapper';
+import { toDailySummaryDetailResponse } from './daily-summary.mapper';
 import { ListDailySummariesQueryDto } from './dto/list-daily-summaries-query.dto';
 import { DocumentsService } from './documents.service';
 import { toDocumentDetailResponse } from './document-detail.mapper';
@@ -31,7 +31,6 @@ import {
   BoletaCreatedResponse,
   DocumentDetailResponse,
   DocumentListResponse,
-  DocumentPrintDataResponse,
   NoteCreatedResponse,
 } from './types/document-response.types';
 import { VoidedDocumentsService } from './voided-documents.service';
@@ -204,15 +203,7 @@ export class DocumentsController {
     @Param('id') id: string,
   ): Promise<DocumentDetailResponse> {
     const doc = await this.documentsService.findById(company.id, id);
-    return toDocumentDetailResponse(doc);
-  }
-
-  @Get(':id/print-data')
-  getPrintData(
-    @CurrentCompany() company: Company,
-    @Param('id') id: string,
-  ): Promise<DocumentPrintDataResponse> {
-    return this.documentsService.getPrintData(company, id);
+    return toDocumentDetailResponse(company, doc);
   }
 
   @Get(':id/xml')
