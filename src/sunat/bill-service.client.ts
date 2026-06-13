@@ -4,6 +4,10 @@ import axios from 'axios';
 import { Company } from '../companies/entities/company.entity';
 import { SunatEnvironment } from '../common/enums';
 import { buildInvoiceZip, parseCdrZip } from './cdr.parser';
+import {
+  buildSunatAuthDebugInfo,
+  resolveSoapUsername,
+} from './sunat-auth-debug.util';
 
 export interface SendBillResult {
   fileName: string;
@@ -34,6 +38,12 @@ export class BillServiceClient {
   private readonly logger = new Logger(BillServiceClient.name);
 
   constructor(private readonly configService: ConfigService) {}
+
+  logSunatAuthContext(company: Company, context: string): void {
+    this.logger.log(
+      `[${context}] ${JSON.stringify(buildSunatAuthDebugInfo(company))}`,
+    );
+  }
 
   async sendBill(
     company: Company,
@@ -85,8 +95,9 @@ export class BillServiceClient {
     const contentFile = zipBuffer.toString('base64');
     const { username, password } = this.resolveCredentials(company);
 
+    this.logSunatAuthContext(company, 'sendSummary');
     this.logger.log(
-      `Sending summary to SUNAT (${company.sunatEnvironment}): ${zipFileName}`,
+      `Sending summary to SUNAT (${company.sunatEnvironment}): ${zipFileName} xmlBytes=${xmlContent.length}`,
     );
 
     const responseBody = await this.postSoap(
@@ -133,7 +144,7 @@ export class BillServiceClient {
     );
     const statusCode = statusCodeMatch?.[1]?.trim() ?? null;
 
-    if (statusCode === '98') {
+    if (this.isSunatProcessingStatusCode(statusCode)) {
       return {
         statusCode,
         description: 'En proceso',
@@ -177,6 +188,10 @@ export class BillServiceClient {
     soapAction: string,
   ): Promise<string> {
     const endpoint = this.resolveBillServiceUrl(company.sunatEnvironment);
+    const { username } = this.resolveCredentials(company);
+    this.logger.log(
+      `SUNAT ${soapAction} → env=${company.sunatEnvironment} ruc=${company.ruc} soapUser=${this.maskSoapUsername(username)} endpoint=${endpoint}`,
+    );
     const response = await axios.post<string>(endpoint, soapEnvelope, {
       headers: {
         'Content-Type': 'text/xml; charset=utf-8',
@@ -189,14 +204,22 @@ export class BillServiceClient {
     const responseBody = response.data;
     const fault = this.extractSoapFault(responseBody);
     if (fault) {
+      this.logger.warn(
+        `SUNAT ${soapAction} SOAP fault (HTTP ${response.status}): ${fault}`,
+      );
       throw new Error(`SUNAT SOAP fault: ${fault}`);
     }
 
     if (response.status >= 400) {
+      this.logger.warn(
+        `SUNAT ${soapAction} HTTP ${response.status}: ${responseBody.slice(0, 500)}`,
+      );
       throw new Error(
         `SUNAT HTTP ${response.status}: ${responseBody.slice(0, 500)}`,
       );
     }
+
+    this.logger.log(`SUNAT ${soapAction} HTTP ${response.status} OK`);
 
     return responseBody;
   }
@@ -229,9 +252,16 @@ export class BillServiceClient {
     }
 
     return {
-      username: company.solUsername,
+      username: resolveSoapUsername(company),
       password: company.solPassword,
     };
+  }
+
+  private maskSoapUsername(username: string): string {
+    if (username.length <= 15) {
+      return username;
+    }
+    return `${username.slice(0, 11)}...${username.slice(-4)}`;
   }
 
   private buildSendBillEnvelope(
@@ -305,6 +335,15 @@ export class BillServiceClient {
     </ser:getStatus>
   </soapenv:Body>
 </soapenv:Envelope>`;
+  }
+
+  /** SUNAT may return `98` or zero-padded `0098` while the summary is still processing. */
+  private isSunatProcessingStatusCode(statusCode: string | null): boolean {
+    if (!statusCode) {
+      return false;
+    }
+    const numeric = Number.parseInt(statusCode, 10);
+    return Number.isFinite(numeric) && numeric === 98;
   }
 
   private extractSoapFault(responseBody: string): string | null {

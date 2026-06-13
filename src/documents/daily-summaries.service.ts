@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -67,6 +68,8 @@ type PreparedRcSubmit = {
 
 @Injectable()
 export class DailySummariesService {
+  private readonly logger = new Logger(DailySummariesService.name);
+
   constructor(
     private readonly dataSource: DataSource,
     @InjectRepository(DailySummary)
@@ -289,6 +292,8 @@ export class DailySummariesService {
       };
     });
 
+    this.logRcPrepared(company, prepared, referenceDate, issueDate);
+
     return this.submitRcToSunat(
       company,
       prepared,
@@ -394,16 +399,30 @@ export class DailySummariesService {
       throw new BadRequestException('Daily summary has no SUNAT ticket');
     }
 
+    if (summary.status === DailySummaryStatus.ACCEPTED) {
+      return this.toResponse(summary);
+    }
+
     if (
-      summary.status === DailySummaryStatus.ACCEPTED ||
-      summary.status === DailySummaryStatus.REJECTED
+      summary.status === DailySummaryStatus.REJECTED &&
+      !this.isRecoverableStatusPoll(summary)
     ) {
       return this.toResponse(summary);
     }
 
-    const documents = await this.documentRepository.find({
+    let documents = await this.documentRepository.find({
       where: { dailySummaryId: summary.id },
     });
+
+    if (documents.length === 0 && this.isRecoverableStatusPoll(summary)) {
+      documents = await this.resolveDocumentsForRecoverablePoll(
+        company.id,
+        summary,
+      );
+      summary.status = DailySummaryStatus.PROCESSING;
+      summary.errorMessage = null;
+      await this.dailySummaryRepository.save(summary);
+    }
 
     try {
       const statusResult = await this.pollSummaryStatus(
@@ -520,6 +539,12 @@ export class DailySummariesService {
     outcome: SummarySubmitOutcome,
     hintWithTicket: string,
   ): Promise<Record<string, unknown>> {
+    this.billServiceClient.logSunatAuthContext(company, 'RC submit start');
+    this.logger.log(
+      `Submitting RC ${prepared.summary.summaryCode} (id=${prepared.summary.id}) ` +
+        `to SUNAT with ${prepared.documents.length} document(s), zip=${prepared.xmlFileName}`,
+    );
+
     try {
       prepared.summary.status = DailySummaryStatus.SUBMITTED;
       await this.dailySummaryRepository.save(prepared.summary);
@@ -552,6 +577,11 @@ export class DailySummariesService {
         outcome,
       );
     } catch (error) {
+      this.billServiceClient.logSunatAuthContext(company, 'RC submit failed');
+      this.logger.warn(
+        `RC ${prepared.summary.summaryCode} (id=${prepared.summary.id}) failed before ticket: ` +
+          `${error instanceof Error ? error.message : String(error)}`,
+      );
       return this.handleSubmitError(
         error,
         prepared.summary,
@@ -560,6 +590,25 @@ export class DailySummariesService {
         outcome,
       );
     }
+  }
+
+  private logRcPrepared(
+    company: Company,
+    prepared: PreparedRcSubmit,
+    referenceDate: string,
+    issueDate: string,
+  ): void {
+    const documentLabels = prepared.documents.map(
+      (doc) => `${doc.serie}-${doc.correlativo}(${doc.docType}/${doc.status})`,
+    );
+
+    this.logger.log(
+      `RC prepared companyId=${company.id} ruc=${company.ruc} ` +
+        `sunatEnv=${company.sunatEnvironment} referenceDate=${referenceDate} issueDate=${issueDate} ` +
+        `summaryCode=${prepared.summary.summaryCode} summaryId=${prepared.summary.id} ` +
+        `documents=[${documentLabels.join(', ')}] xmlFile=${prepared.xmlFileName}`,
+    );
+    this.billServiceClient.logSunatAuthContext(company, 'RC prepared');
   }
 
   private async pollSummaryStatus(
@@ -614,6 +663,9 @@ export class DailySummariesService {
           finalizeBoletaVoid(doc, summary.id);
         } else {
           doc.status = DocumentStatus.ACCEPTED;
+          if (!doc.dailySummaryId) {
+            doc.dailySummaryId = summary.id;
+          }
         }
         await this.documentRepository.save(doc);
       }
@@ -1019,6 +1071,42 @@ export class DailySummariesService {
           ? 'SUNAT did not return a ticket. Boletas were not linked; you may POST /v1/daily-summaries again.'
           : undefined,
     });
+  }
+
+  private async resolveDocumentsForRecoverablePoll(
+    companyId: string,
+    summary: DailySummary,
+  ): Promise<Document[]> {
+    if (summary.summaryType === DailySummaryType.RA) {
+      return [];
+    }
+
+    if (isVoidRcXml(summary.xmlContent)) {
+      return [];
+    }
+
+    const { documents } = await this.findAltaRcDocuments(
+      companyId,
+      summary.referenceDate,
+    );
+    return documents;
+  }
+
+  /** False rejections when SUNAT returned processing code without CDR yet. */
+  private isRecoverableStatusPoll(summary: DailySummary): boolean {
+    if (!summary.ticket || summary.cdrXml) {
+      return false;
+    }
+
+    const code = summary.statusCode?.trim();
+    if (code && Number.parseInt(code, 10) === 98) {
+      return true;
+    }
+
+    return (
+      summary.errorMessage === 'SUNAT response without content' ||
+      summary.errorMessage === 'En proceso'
+    );
   }
 
   private resolveSummaryOutcome(

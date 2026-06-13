@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -48,6 +49,8 @@ const IGV_RATE = 0.18;
 
 @Injectable()
 export class DocumentsService {
+  private readonly logger = new Logger(DocumentsService.name);
+
   constructor(
     private readonly dataSource: DataSource,
     @InjectRepository(Document)
@@ -306,6 +309,12 @@ export class DocumentsService {
         xmlFileName: `${fileBaseName}.xml`,
       };
     });
+
+    this.logger.log(
+      `Boleta ${dto.serie}-${prepared.document.correlativo} signed locally ` +
+        `(ruc=${company.ruc}, sunatEnv=${company.sunatEnvironment}, ` +
+        `documentId=${prepared.document.id}). SUNAT RC not sent yet.`,
+    );
 
     return {
       id: prepared.document.id,
